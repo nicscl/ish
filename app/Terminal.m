@@ -11,6 +11,9 @@
 #include "LinuxInterop.h"
 #include "fs/devices.h"
 #include "fs/tty.h"
+#if !ISH_LINUX
+#include "kernel/signal.h"
+#endif
 #include "fs/devices.h"
 
 extern struct tty_driver ios_pty_driver;
@@ -338,17 +341,34 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
     }
 }
 
-- (void)destroy {
+- (void)hangup {
     tty_t tty = self.tty;
     if (tty != NULL) {
 #if !ISH_LINUX
         lock(&tty->lock);
         tty_hangup(tty);
+        pid_t_ fg_group = tty->fg_group;
         unlock(&tty->lock);
+        // Like Linux, tell the foreground job the terminal went away, or a process
+        // blocked somewhere other than a tty read would never notice. Sent after
+        // dropping tty->lock: send_group_signal takes pids_lock, and tty_open takes
+        // the two in the opposite order.
+        if (fg_group != 0) {
+            send_group_signal(fg_group, SIGHUP_, SIGINFO_NIL);
+            send_group_signal(fg_group, SIGCONT_, SIGINFO_NIL);
+        }
 #else
         tty->ops->hangup(tty);
 #endif
     }
+    @synchronized (Terminal.class) {
+        if ([terminals objectForKey:self.terminalsKey] == self)
+            [terminals removeObjectForKey:self.terminalsKey];
+    }
+}
+
+- (void)destroy {
+    [self hangup];
     // Drop unrendered output and wake a writer blocked in sendOutput; its next
     // write fails with EIO now that the tty is hung up.
 #if !ISH_LINUX
@@ -363,10 +383,6 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
         _pendingData.length = 0;
     }
 #endif
-    @synchronized (Terminal.class) {
-        if ([terminals objectForKey:self.terminalsKey] == self)
-            [terminals removeObjectForKey:self.terminalsKey];
-    }
 }
 
 - (void)dealloc {
@@ -378,6 +394,7 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
     WKWebView *webView = _webView;
     _refreshTask = _scrollToBottomTask = nil;
     _webView = nil;
+    NSLog(@"Terminal %@ deallocated", self.uuid);
     dispatch_block_t cleanup = ^{
         [refreshTask cancel];
         [scrollToBottomTask cancel];

@@ -174,6 +174,10 @@ static int start_process(NSArray<NSString *> *command, Terminal **terminalOut) {
     [self.mutableSessions addObject:session];
 #if !ISH_LINUX
     task_start(current);
+    // The task now runs on its own thread. If main kept pointing at it, signals sent
+    // from main (e.g. SIGHUP on close) would take the "signalling myself" path and
+    // not wake the task's thread.
+    current = NULL;
 #endif
     return session;
 }
@@ -196,7 +200,8 @@ static int start_process(NSArray<NSString *> *command, Terminal **terminalOut) {
         if (session.pid == pid && session.state == TerminalSessionStateRunning) {
             session.exitCode = code;
             session.state = TerminalSessionStateExited;
-            [session.terminal destroy];
+            // Not destroy: the tab stays visible, so output still in flight must be rendered.
+            [session.terminal hangup];
             [session notifyChanged];
             return;
         }
