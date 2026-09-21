@@ -84,9 +84,9 @@
     [self.view addSubview:self.tabBar];
     self.termTop.active = NO;
     [NSLayoutConstraint activateConstraints:@[
-        [self.tabBar.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
-        [self.tabBar.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor],
-        [self.tabBar.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor],
+        [self.tabBar.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [self.tabBar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.tabBar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [self.termView.topAnchor constraintEqualToAnchor:self.tabBar.bottomAnchor],
     ]];
     [self tabsDidChange];
@@ -286,6 +286,19 @@
 - (void)tabBar:(TabBarView *)tabBar didRequestCloseTabAtIndex:(NSUInteger)index {
     if (index < self.tabs.count)
         [self closeTab:self.tabs[index]];
+}
+
+- (void)tabBar:(TabBarView *)tabBar didRequestCloseOtherTabsAtIndex:(NSUInteger)index {
+    if (index >= self.tabs.count)
+        return;
+    TerminalSession *keep = self.tabs[index];
+    self.selectedSession = keep;
+    // Snapshot first: closeTab: mutates tabs.
+    for (TerminalSession *session in [self.tabs copy]) {
+        if (session != keep)
+            [self closeTab:session];
+    }
+    [self.termView becomeFirstResponder];
 }
 
 - (void)tabBarDidRequestNewTab:(TabBarView *)tabBar {

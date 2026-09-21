@@ -48,6 +48,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface UIColor (iSH)
 - (nullable instancetype)ish_initWithHexString:(NSString *)string;
+// self mixed with color; fraction 0 returns self, 1 returns color.
+- (UIColor *)ish_blendedWithColor:(UIColor *)color fraction:(CGFloat)fraction;
 @end
 
 extern NSString *const ThemesUpdatedNotification;

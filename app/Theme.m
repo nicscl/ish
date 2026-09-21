@@ -56,6 +56,16 @@ char *get_documents_directory_impl(void) {
     }
     return [UIColor colorWithRed:1.0 * red / 0xff green:1.0 * green / 0xff blue:1.0 * blue / 0xff alpha:1.0 * alpha / 0xff];
 }
+
+- (UIColor *)ish_blendedWithColor:(UIColor *)color fraction:(CGFloat)fraction {
+    CGFloat r1 = 0, g1 = 0, b1 = 0, a1 = 0, r2 = 0, g2 = 0, b2 = 0, a2 = 0;
+    [self getRed:&r1 green:&g1 blue:&b1 alpha:&a1];
+    [color getRed:&r2 green:&g2 blue:&b2 alpha:&a2];
+    return [UIColor colorWithRed:r1 + (r2 - r1) * fraction
+                           green:g1 + (g2 - g1) * fraction
+                            blue:b1 + (b2 - b1) * fraction
+                           alpha:a1 + (a2 - a1) * fraction];
+}
 @end
 
 @interface DirectoryWatcher: NSObject<NSFilePresenter>

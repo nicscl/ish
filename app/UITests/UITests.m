@@ -97,9 +97,37 @@
     [self.app typeText:@"echo in-tab-one\n"];
     [self waitForTerminalText:@"in-tab-one" timeout:10];
 
+    // The close control only shows on the selected (or hovered) tab.
+    XCTAssertFalse(self.app.buttons[@"close tab 2"].isHittable);
+    [self.app.buttons[@"tab 2"] tap];
+    XCTAssert([self.app.buttons[@"close tab 2"] waitForExistenceWithTimeout:5]);
     [self.app.buttons[@"close tab 2"] tap];
     XCTAssert([self.app.buttons[@"tab 2"] waitForNonExistenceWithTimeout:5]);
     [self waitForTerminalText:@"in-tab-one" timeout:5];
+}
+
+// Enough tabs to overflow the strip on an iPad: the strip must scroll and stay usable.
+- (void)testManyTabsOverflow {
+    [self waitForTerminalText:@":~#" timeout:30];
+    for (int i = 2; i <= 10; i++) {
+        [self.app.buttons[@"new tab"] tap];
+        NSString *tab = [NSString stringWithFormat:@"tab %d", i];
+        XCTAssert([self.app.buttons[tab] waitForExistenceWithTimeout:5]);
+    }
+    [self waitForTerminalText:@":~#" timeout:30];
+    [self.app typeText:@"echo in-tab-ten\n"];
+    [self waitForTerminalText:@"in-tab-ten" timeout:10];
+    [self attachScreenshotNamed:@"ten tabs"];
+    // A drag that starts on a tab scrolls the strip; it neither selects nor closes that tab.
+    XCTAssertFalse(self.app.buttons[@"tab 1"].isHittable);
+    [self.app.buttons[@"tab 7"] swipeRight];
+    XCTAssert([self.app.buttons[@"tab 1"] waitForExistenceWithTimeout:5]);
+    XCTAssert(self.app.buttons[@"tab 1"].isHittable);
+    XCTAssert(self.app.buttons[@"tab 7"].exists);
+    [self waitForTerminalText:@"in-tab-ten" timeout:5];
+    [self.app.buttons[@"tab 1"] tap];
+    XCTAssert([[self terminalLinesContaining:@"in-tab-ten"].firstMatch waitForNonExistenceWithTimeout:5]);
+    [self attachScreenshotNamed:@"ten tabs, first selected"];
 }
 
 // When the only shell exits, a fresh one takes its place.
