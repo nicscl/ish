@@ -90,6 +90,7 @@
     [self waitForTerminalText:@":~#" timeout:30];
     [self.app typeText:@"echo in-tab-two\n"];
     [self waitForTerminalText:@"in-tab-two" timeout:10];
+    [self attachScreenshotNamed:@"two tabs"];
 
     [self.app.buttons[@"tab 1"] tap];
     XCTAssert([[self terminalLinesContaining:@"in-tab-two"].firstMatch waitForNonExistenceWithTimeout:5]);
@@ -111,6 +112,14 @@
     [self waitForTerminalText:@":~#" timeout:30];
     [self.app typeText:@"echo after-$((6*7))\n"];
     [self waitForTerminalText:@"after-42" timeout:10];
+}
+
+// Kept in the result bundle so the tab strip can be looked at after a run.
+- (void)attachScreenshotNamed:(NSString *)name {
+    XCTAttachment *attachment = [XCTAttachment attachmentWithScreenshot:[XCUIScreen.mainScreen screenshot]];
+    attachment.name = name;
+    attachment.lifetime = XCTAttachmentLifetimeKeepAlways;
+    [self addAttachment:attachment];
 }
 
 - (void)testShellRunsCommands {
