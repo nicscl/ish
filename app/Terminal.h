@@ -10,6 +10,12 @@
 
 struct tty;
 
+// WKUserContentController retains its message handlers, so anything that owns
+// the web view must register through this to avoid a retain cycle.
+@interface WeakScriptMessageHandler : NSObject <WKScriptMessageHandler>
+- (instancetype)initWithHandler:(id <WKScriptMessageHandler>)handler;
+@end
+
 @interface Terminal : NSObject
 
 + (Terminal *)terminalWithType:(int)type number:(int)number;
@@ -29,6 +35,8 @@ struct tty;
 - (NSString *)arrow:(char)direction;
 
 // Make this terminal no longer be the singleton terminal with its type and number. Will happen eventually if all references go away, but sometimes you want it to happen now.
+// Hangs up the tty (the shell sees EIO/EOF), drops any output still waiting to
+// be rendered and unblocks a writer waiting for it. Safe to call more than once.
 - (void)destroy;
 
 @property (readonly) WKWebView *webView;

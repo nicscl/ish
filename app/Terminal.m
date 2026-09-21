@@ -45,6 +45,19 @@ typedef struct linux_tty *tty_t;
 
 @end
 
+@implementation WeakScriptMessageHandler {
+    __weak id <WKScriptMessageHandler> _handler;
+}
+- (instancetype)initWithHandler:(id <WKScriptMessageHandler>)handler {
+    if (self = [super init])
+        _handler = handler;
+    return self;
+}
+- (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
+    [_handler userContentController:userContentController didReceiveScriptMessage:message];
+}
+@end
+
 @interface CustomWebView : WKWebView
 @end
 @implementation CustomWebView
@@ -95,14 +108,14 @@ static NSMapTable<NSUUID *, Terminal *> *terminalsByUUID;
     }
 }
 
+static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"resize", @"propUpdate"};
+
 - (WKWebView *)webView {
     if (_webView == nil) {
         WKWebViewConfiguration *config = [WKWebViewConfiguration new];
-        [config.userContentController addScriptMessageHandler:self name:@"load"];
-        [config.userContentController addScriptMessageHandler:self name:@"log"];
-        [config.userContentController addScriptMessageHandler:self name:@"sendInput"];
-        [config.userContentController addScriptMessageHandler:self name:@"resize"];
-        [config.userContentController addScriptMessageHandler:self name:@"propUpdate"];
+        id <WKScriptMessageHandler> handler = [[WeakScriptMessageHandler alloc] initWithHandler:self];
+        for (size_t i = 0; i < sizeof(TERMINAL_HANDLERS)/sizeof(TERMINAL_HANDLERS[0]); i++)
+            [config.userContentController addScriptMessageHandler:handler name:TERMINAL_HANDLERS[i]];
         // Make the web view really big so that if a program tries to write to the terminal before it's displayed, the text probably won't wrap too badly.
         CGRect webviewSize = CGRectMake(0, 0, 10000, 10000);
         _webView = [[CustomWebView alloc] initWithFrame:webviewSize configuration:config];
@@ -320,18 +333,49 @@ static NSMapTable<NSUUID *, Terminal *> *terminalsByUUID;
     tty_t tty = self.tty;
     if (tty != NULL) {
 #if !ISH_LINUX
-        if (tty != NULL) {
-            lock(&tty->lock);
-            tty_hangup(tty);
-            unlock(&tty->lock);
-        }
+        lock(&tty->lock);
+        tty_hangup(tty);
+        unlock(&tty->lock);
 #else
         tty->ops->hangup(tty);
 #endif
     }
-    @synchronized (Terminal.class) {
-        [terminals removeObjectForKey:self.terminalsKey];
+    // Drop unrendered output and wake a writer blocked in sendOutput; its next
+    // write fails with EIO now that the tty is hung up.
+#if !ISH_LINUX
+    lock(&_dataLock);
+    _pendingData.length = 0;
+    notify(&_dataConsumed);
+    unlock(&_dataLock);
+#else
+    @synchronized (self) {
+        _pendingData.length = 0;
     }
+#endif
+    @synchronized (Terminal.class) {
+        if ([terminals objectForKey:self.terminalsKey] == self)
+            [terminals removeObjectForKey:self.terminalsKey];
+    }
+}
+
+- (void)dealloc {
+    // The last reference can be dropped from the emulator thread (ios_tty_cleanup),
+    // but WebKit and the timers are main-thread only.
+    DelayedUITask *refreshTask = _refreshTask, *scrollToBottomTask = _scrollToBottomTask;
+    WKWebView *webView = _webView;
+    dispatch_block_t cleanup = ^{
+        [refreshTask cancel];
+        [scrollToBottomTask cancel];
+        if (webView != nil) {
+            WKUserContentController *controller = webView.configuration.userContentController;
+            for (size_t i = 0; i < sizeof(TERMINAL_HANDLERS)/sizeof(TERMINAL_HANDLERS[0]); i++)
+                [controller removeScriptMessageHandlerForName:TERMINAL_HANDLERS[i]];
+        }
+    };
+    if (NSThread.isMainThread)
+        cleanup();
+    else
+        dispatch_async(dispatch_get_main_queue(), cleanup);
 }
 
 + (void)initialize {

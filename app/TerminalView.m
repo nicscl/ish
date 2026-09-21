@@ -16,21 +16,6 @@ struct rowcol {
     int col;
 };
 
-@interface WeakScriptMessageHandler : NSObject <WKScriptMessageHandler>
-@property (weak) id <WKScriptMessageHandler> handler;
-@end
-@implementation WeakScriptMessageHandler
-- (instancetype)initWithHandler:(id <WKScriptMessageHandler>)handler {
-    if (self = [super init]) {
-        self.handler = handler;
-    }
-    return self;
-}
-- (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
-    [self.handler userContentController:userContentController didReceiveScriptMessage:message];
-}
-@end
-
 @interface TerminalView ()
 
 @property (nonatomic) NSMutableArray<UIKeyCommand *> *keyCommands;
@@ -134,6 +119,11 @@ static NSString *const HANDLERS[] = {@"syncFocus", @"focus", @"newScrollHeight",
 
     self.scrollbarView.contentView = webView;
     [self.scrollbarView addSubview:webView];
+
+    // Anything that happened while this terminal was detached (output, scrolling,
+    // focus changes) was not delivered to us, so pull the current state explicitly.
+    [webView evaluateJavaScript:@"exports.resyncScroll()" completionHandler:nil];
+    self.terminalFocused = self.isFirstResponder;
 }
 
 - (void)uninstallTerminalView {

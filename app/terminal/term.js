@@ -39,6 +39,9 @@ x-row {
 function onTerminalReady() {
 
 // Shorthand for JS -> native IPC
+// Presentation handlers (focus, scrolling, links) are only registered while a
+// TerminalView is showing this terminal, so a message with no handler is dropped
+// rather than thrown: a hidden terminal must keep processing output.
 const native = new Proxy({}, {
     get(obj, prop) {
         return (...args) => {
@@ -46,10 +49,13 @@ const native = new Proxy({}, {
                 args = null;
             else if (args.length == 1)
                 args = args[0];
-            webkit.messageHandlers[prop].postMessage(args);
+            const handler = webkit.messageHandlers[prop];
+            if (handler !== undefined)
+                handler.postMessage(args);
         };
     },
 });
+window.addEventListener('error', (e) => native.log('term.js error: ' + e.message + ' at ' + e.filename + ':' + e.lineno));
 
 // Functions for native -> JS
 window.exports = {};
@@ -130,6 +136,13 @@ function syncScroll() {
         native.newScrollTop(scrollTop);
     lastScrollTop = scrollTop;
 }
+
+// Called by native code when a TerminalView (re)attaches, since scroll updates
+// sent while detached were dropped.
+exports.resyncScroll = () => {
+    lastScrollHeight = lastScrollTop = undefined;
+    syncScroll();
+};
 
 const realSyncScrollHeight = hterm.ScrollPort.prototype.syncScrollHeight;
 hterm.ScrollPort.prototype.syncScrollHeight = function() {
