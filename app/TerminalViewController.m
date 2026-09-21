@@ -181,15 +181,29 @@
     self.selectedSession = session;
 }
 
-- (void)reconnectSessionFromTerminalUUID:(NSUUID *)uuid {
-    TerminalSession *session = [TerminalSessionStore.shared sessionWithUUID:uuid];
-    if (session == nil) {
+- (void)reconnectSessionsFromTerminalUUIDs:(NSArray<NSUUID *> *)uuids selected:(NSUUID *)selected {
+    TerminalSessionStore *store = TerminalSessionStore.shared;
+    TerminalSession *toSelect = nil;
+    for (NSUUID *uuid in uuids) {
+        TerminalSession *session = [store sessionWithUUID:uuid];
+        if (session == nil || [self.tabs containsObject:session])
+            continue;
+        [self.tabs addObject:session];
+        if ([uuid isEqual:selected])
+            toSelect = session;
+    }
+    if (self.tabs.count == 0) {
         [self startNewSession];
         return;
     }
-    if (![self.tabs containsObject:session])
-        [self.tabs addObject:session];
-    self.selectedSession = session;
+    self.selectedSession = toSelect ?: self.tabs.firstObject;
+}
+
+- (NSArray<NSUUID *> *)tabTerminalUUIDs {
+    NSMutableArray<NSUUID *> *uuids = [NSMutableArray new];
+    for (TerminalSession *session in self.tabs)
+        [uuids addObject:session.uuid];
+    return uuids;
 }
 
 - (NSUUID *)sessionTerminalUUID {

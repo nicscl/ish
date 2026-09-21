@@ -311,13 +311,14 @@ void NetworkReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
 
 - (void)application:(UIApplication *)application didDiscardSceneSessions:(NSSet<UISceneSession *> *)sceneSessions API_AVAILABLE(ios(13.0)) {
     for (UISceneSession *sceneSession in sceneSessions) {
-        NSString *terminalUUID = sceneSession.stateRestorationActivity.userInfo[@"TerminalUUID"];
-        if (terminalUUID == nil)
+        if (sceneSession.stateRestorationActivity == nil)
             continue;
         TerminalSessionStore *store = TerminalSessionStore.shared;
-        TerminalSession *session = [store sessionWithUUID:[[NSUUID alloc] initWithUUIDString:terminalUUID]];
-        if (session != nil)
-            [store closeSession:session];
+        for (NSUUID *uuid in SceneTerminalUUIDs(sceneSession.stateRestorationActivity)) {
+            TerminalSession *session = [store sessionWithUUID:uuid];
+            if (session != nil)
+                [store closeSession:session];
+        }
     }
 }
 

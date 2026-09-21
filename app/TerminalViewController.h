@@ -14,9 +14,11 @@
 
 // Opens a new shell in a new tab and selects it.
 - (void)startNewSession;
-// Adopts an existing session (e.g. after the window was reconnected); starts a new one if it no longer exists.
-- (void)reconnectSessionFromTerminalUUID:(NSUUID *)uuid;
-// UUID of the selected tab's session, nil if none.
+// Adopts the sessions that still exist (e.g. after the window was reconnected), in
+// order, selecting the given one; starts a new session if none of them exist.
+- (void)reconnectSessionsFromTerminalUUIDs:(NSArray<NSUUID *> *)uuids selected:(NSUUID *)selected;
+// UUIDs of this window's tabs, in order, and of the selected one (nil if none).
+@property (readonly) NSArray<NSUUID *> *tabTerminalUUIDs;
 @property (readonly) NSUUID *sessionTerminalUUID;
 @property UISceneSession *sceneSession API_AVAILABLE(ios(13.0));
 

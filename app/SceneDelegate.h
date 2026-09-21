@@ -12,6 +12,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 extern TerminalViewController *currentTerminalViewController;
 
+// All session UUIDs recorded in a scene's restoration activity (selected first).
+extern NSArray<NSUUID *> *SceneTerminalUUIDs(NSUserActivity *activity);
+
 API_AVAILABLE(ios(13))
 @interface SceneDelegate : UIResponder <UIWindowSceneDelegate>
 
