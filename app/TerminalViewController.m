@@ -582,6 +582,10 @@
                                  modifierFlags:UIKeyModifierCommand
                                         action:@selector(selectTabByNumber:)]];
         }
+        if (@available(iOS 15, *)) {
+            for (UIKeyCommand *command in commands)
+                command.wantsPriorityOverSystemBehavior = YES;
+        }
     }
     return commands;
 }

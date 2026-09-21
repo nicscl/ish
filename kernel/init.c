@@ -114,6 +114,10 @@ int become_new_init_child(void) {
     task->vfork = NULL;
     task->blocked = task->pending = task->waiting = 0;
     list_init(&task->queue);
+    // init (pid 1) itself has no exit signal, but init must be told when this
+    // child dies or it never reaps the zombie, which keeps a reference to the
+    // child's controlling terminal forever.
+    task->exit_signal = SIGCHLD_;
     // TODO: think about whether it would be a good idea to inherit fs_info
 
     current = task;

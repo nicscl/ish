@@ -54,6 +54,9 @@ NSNotificationName const TerminalSessionDidChangeNotification = @"TerminalSessio
 @interface TerminalSessionStore ()
 @property NSMutableArray<TerminalSession *> *mutableSessions;
 @property NSUInteger nextNumber;
+// pids of every process started here that has not been reaped yet, including
+// those of sessions already closed
+@property NSMutableSet<NSNumber *> *livePids;
 @end
 
 @implementation TerminalSessionStore
@@ -70,6 +73,7 @@ NSNotificationName const TerminalSessionDidChangeNotification = @"TerminalSessio
 - (instancetype)init {
     if (self = [super init]) {
         self.mutableSessions = [NSMutableArray new];
+        self.livePids = [NSMutableSet new];
         self.nextNumber = 1;
 #if !ISH_LINUX
         [NSNotificationCenter.defaultCenter addObserver:self
@@ -172,6 +176,7 @@ static int start_process(NSArray<NSString *> *command, Terminal **terminalOut) {
     session.startDate = [NSDate date];
     // Register before the process can run, so an immediately exiting command is still matched.
     [self.mutableSessions addObject:session];
+    [self.livePids addObject:@(pid)];
 #if !ISH_LINUX
     task_start(current);
     // The task now runs on its own thread. If main kept pointing at it, signals sent
@@ -196,6 +201,14 @@ static int start_process(NSArray<NSString *> *command, Terminal **terminalOut) {
 - (void)processExited:(NSNotification *)notif {
     int pid = [notif.userInfo[@"pid"] intValue];
     int code = [notif.userInfo[@"code"] intValue];
+    if (![self.livePids containsObject:@(pid)])
+        return; // not ours (e.g. something init spawned itself)
+    [self.livePids removeObject:@(pid)];
+    // Sessions are children of init, and init does not wait for them. The zombie holds
+    // a reference to its controlling terminal, so it must be reaped here (whether or not
+    // its tab is still open) or the pty, and with it the Terminal and its web view,
+    // live forever.
+    reap_init_child(pid);
     for (TerminalSession *session in self.mutableSessions) {
         if (session.pid == pid && session.state == TerminalSessionStateRunning) {
             session.exitCode = code;

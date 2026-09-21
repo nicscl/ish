@@ -202,6 +202,24 @@ dword_t sys_exit_group(dword_t status) {
 #define P_PID_ 1
 #define P_PGID_ 2
 
+static bool reap_if_zombie(struct task *task, struct siginfo_ *info_out, struct rusage_ *rusage_out, int options);
+
+bool reap_init_child(pid_t_ pid) {
+    lock(&pids_lock);
+    bool reaped = false;
+    struct task *task = pid_get_task_zombie(pid);
+    if (task != NULL && task->zombie && task->parent != NULL && task->parent->pid == 1) {
+        // reap_if_zombie charges the child's rusage to current, i.e. the parent
+        struct task *saved_current = current;
+        current = task->parent;
+        struct siginfo_ info;
+        reaped = reap_if_zombie(task, &info, NULL, 0);
+        current = saved_current;
+    }
+    unlock(&pids_lock);
+    return reaped;
+}
+
 // returns false if the task cannot be reaped and true if the task was reaped
 static bool reap_if_zombie(struct task *task, struct siginfo_ *info_out, struct rusage_ *rusage_out, int options) {
     if (!task->zombie)

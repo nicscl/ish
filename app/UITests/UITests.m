@@ -74,6 +74,7 @@
     [self waitForTerminalText:@"mark-one-again" timeout:10];
     [self.app typeText:@"echo still-$((6*7))\n"];
     [self waitForTerminalText:@"still-42" timeout:10];
+    sleep(3); // let the closed shell die, so the log shows its terminal being freed
 }
 
 // The tab strip: + opens a tab, tapping a tab selects it, x closes it.
