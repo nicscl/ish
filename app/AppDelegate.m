@@ -11,6 +11,7 @@
 #import <SystemConfiguration/SystemConfiguration.h>
 #import "AboutViewController.h"
 #import "AppDelegate.h"
+#import "TerminalSession.h"
 #import "AppGroup.h"
 #import "CurrentRoot.h"
 #import "ExceptionExfiltrator.h"
@@ -311,7 +312,12 @@ void NetworkReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
 - (void)application:(UIApplication *)application didDiscardSceneSessions:(NSSet<UISceneSession *> *)sceneSessions API_AVAILABLE(ios(13.0)) {
     for (UISceneSession *sceneSession in sceneSessions) {
         NSString *terminalUUID = sceneSession.stateRestorationActivity.userInfo[@"TerminalUUID"];
-        [[Terminal terminalWithUUID:[[NSUUID alloc] initWithUUIDString:terminalUUID]] destroy];
+        if (terminalUUID == nil)
+            continue;
+        TerminalSessionStore *store = TerminalSessionStore.shared;
+        TerminalSession *session = [store sessionWithUUID:[[NSUUID alloc] initWithUUIDString:terminalUUID]];
+        if (session != nil)
+            [store closeSession:session];
     }
 }
 

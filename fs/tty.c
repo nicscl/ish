@@ -795,6 +795,12 @@ void tty_set_winsize(struct tty *tty, struct winsize_ winsize) {
 void tty_hangup(struct tty *tty) {
     tty->hung_up = true;
     tty_input_wakeup(tty);
+    // Like Linux, tell the foreground job the terminal went away; a process
+    // blocked somewhere other than a tty read would otherwise never notice.
+    if (tty->fg_group != 0) {
+        send_group_signal(tty->fg_group, SIGHUP_, SIGINFO_NIL);
+        send_group_signal(tty->fg_group, SIGCONT_, SIGINFO_NIL);
+    }
 }
 
 struct dev_ops tty_dev = {

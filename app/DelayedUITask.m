@@ -26,6 +26,13 @@
 }
 
 - (void)schedule {
+    // NSRunLoop is not thread safe, and schedule is called from the emulator thread.
+    if (!NSThread.isMainThread) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self schedule];
+        });
+        return;
+    }
     if (self.timer.valid)
         return;
     __weak DelayedUITask *weakSelf = self;
@@ -44,6 +51,7 @@
 }
 
 - (void)cancel {
+    NSAssert(NSThread.isMainThread, @"cancel is main thread only");
     [self.timer invalidate];
     self.timer = nil;
 }

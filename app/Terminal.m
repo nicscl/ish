@@ -34,6 +34,8 @@ typedef struct linux_tty *tty_t;
 @property (nonatomic) NSMutableData *pendingData;
 // sending output is an asynchronous thing due to javascript, this is used to ensure it doesn't happen twice at once
 @property (nonatomic) BOOL outputInProgress;
+// set by destroy (under dataLock for !linux); output is discarded from then on
+@property (nonatomic) BOOL destroyed;
 
 @property DelayedUITask *refreshTask;
 @property DelayedUITask *scrollToBottomTask;
@@ -195,14 +197,21 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
     if (!NSThread.isMainThread) {
         // The main thread is the only one that can unblock this, so sleeping here would be a deadlock.
         // The only reason for this to be called on the main thread is if input is echoed.
-        while (_pendingData.length > BUF_SIZE)
+        while (_pendingData.length > BUF_SIZE && !_destroyed)
             wait_for_ignore_signals(&_dataConsumed, &_dataLock, NULL);
+    }
+    if (_destroyed) {
+        // Nobody will ever render this; pretend it was written so the writer moves on to its EIO.
+        unlock(&_dataLock);
+        return len;
     }
     [_pendingData appendData:[NSData dataWithBytes:buf length:len]];
     [self.refreshTask schedule];
     unlock(&_dataLock);
 #else
     @synchronized (self) {
+        if (_destroyed)
+            return len;
         int room = [self roomForOutput];
         if (len > room)
             len = room;
@@ -344,11 +353,13 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
     // write fails with EIO now that the tty is hung up.
 #if !ISH_LINUX
     lock(&_dataLock);
+    _destroyed = YES;
     _pendingData.length = 0;
     notify(&_dataConsumed);
     unlock(&_dataLock);
 #else
     @synchronized (self) {
+        _destroyed = YES;
         _pendingData.length = 0;
     }
 #endif
@@ -360,9 +371,13 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
 
 - (void)dealloc {
     // The last reference can be dropped from the emulator thread (ios_tty_cleanup),
-    // but WebKit and the timers are main-thread only.
+    // but WebKit and the timers are main-thread only. Ownership of those objects is
+    // moved out of the ivars and into the block, so their final release happens
+    // wherever the block is destroyed: on the main thread.
     DelayedUITask *refreshTask = _refreshTask, *scrollToBottomTask = _scrollToBottomTask;
     WKWebView *webView = _webView;
+    _refreshTask = _scrollToBottomTask = nil;
+    _webView = nil;
     dispatch_block_t cleanup = ^{
         [refreshTask cancel];
         [scrollToBottomTask cancel];

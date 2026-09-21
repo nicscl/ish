@@ -8,6 +8,7 @@
 #import "TerminalViewController.h"
 #import "AppDelegate.h"
 #import "TerminalView.h"
+#import "TerminalSession.h"
 #import "BarButton.h"
 #import "ArrowBarButton.h"
 #import "UserPreferences.h"
@@ -46,8 +47,11 @@
 @property (weak, nonatomic) IBOutlet UIButton *pasteButton;
 @property (weak, nonatomic) IBOutlet UIButton *hideKeyboardButton;
 
-@property int sessionPid;
-@property (nonatomic) Terminal *sessionTerminal;
+// Sessions shown in this window, in tab order. All of them are also in the TerminalSessionStore.
+@property NSMutableArray<TerminalSession *> *tabs;
+@property (nonatomic) TerminalSession *selectedSession;
+// The selected tab's terminal (self.terminal differs from this while a console is shown).
+@property (readonly) Terminal *sessionTerminal;
 
 @property BOOL ignoreKeyboardMotion;
 @property (nonatomic) BOOL hasExternalKeyboard;
@@ -131,12 +135,12 @@
 
 - (void)awakeFromNib {
     [super awakeFromNib];
-#if !ISH_LINUX
+    self.tabs = [NSMutableArray new];
     [NSNotificationCenter.defaultCenter addObserver:self
-                                           selector:@selector(processExited:)
-                                               name:ProcessExitedNotification
+                                           selector:@selector(sessionDidChange:)
+                                               name:TerminalSessionDidChangeNotification
                                              object:nil];
-#else
+#if ISH_LINUX
     [NSNotificationCenter.defaultCenter addObserver:self
                                            selector:@selector(kernelPanicked:)
                                                name:KernelPanicNotification
@@ -150,107 +154,97 @@
 }
 
 - (void)startNewSession {
-    int err = [self startSession];
-    if (err < 0) {
+    int err = 0;
+    TerminalSession *session = [TerminalSessionStore.shared startSessionWithError:&err];
+    if (session == nil) {
         [self showMessage:@"could not start session"
                  subtitle:[NSString stringWithFormat:@"error code %d", err]];
+        return;
     }
+    [self.tabs addObject:session];
+    self.selectedSession = session;
 }
 
 - (void)reconnectSessionFromTerminalUUID:(NSUUID *)uuid {
-    self.sessionTerminal = [Terminal terminalWithUUID:uuid];
-    if (self.sessionTerminal == nil)
+    TerminalSession *session = [TerminalSessionStore.shared sessionWithUUID:uuid];
+    if (session == nil) {
         [self startNewSession];
+        return;
+    }
+    if (![self.tabs containsObject:session])
+        [self.tabs addObject:session];
+    self.selectedSession = session;
 }
 
 - (NSUUID *)sessionTerminalUUID {
-    return self.terminal.uuid;
+    return self.selectedSession.uuid;
 }
 
-- (int)startSession {
-    NSArray<NSString *> *command = UserPreferences.shared.launchCommand;
-
-#if !ISH_LINUX
-    int err = become_new_init_child();
-    if (err < 0)
-        return err;
-    struct tty *tty;
-    self.sessionTerminal = nil;
-    Terminal *terminal = [Terminal createPseudoTerminal:&tty];
-    if (terminal == nil) {
-        NSAssert(IS_ERR(tty), @"tty should be error");
-        return (int) PTR_ERR(tty);
-    }
-    self.sessionTerminal = terminal;
-    NSString *stdioFile = [NSString stringWithFormat:@"/dev/pts/%d", tty->num];
-    err = create_stdio(stdioFile.fileSystemRepresentation, TTY_PSEUDO_SLAVE_MAJOR, tty->num);
-    if (err < 0)
-        return err;
-    tty_release(tty);
-
-    char argv[4096];
-    [Terminal convertCommand:command toArgs:argv limitSize:sizeof(argv)];
-    const char *envp = "TERM=xterm-256color\0";
-    err = do_execve(command[0].UTF8String, command.count, argv, envp);
-    if (err < 0)
-        return err;
-    self.sessionPid = current->pid;
-    task_start(current);
-#else
-    const char *argv_arr[command.count + 1];
-    for (NSUInteger i = 0; i < command.count; i++)
-        argv_arr[i] = command[i].UTF8String;
-    argv_arr[command.count] = NULL;
-    const char *envp_arr[] = {
-        "TERM=xterm-256color",
-        NULL,
-    };
-    const char *const *argv = argv_arr;
-    const char *const *envp = envp_arr;
-    __block Terminal *terminal = nil;
-    __block int sessionPid = 0;
-    __block int err = 1;
-    sync_do_in_workqueue(^(void (^done)(void)) {
-        linux_start_session(argv[0], argv, envp, ^(int retval, int pid, nsobj_t term) {
-            err = retval;
-            if (term)
-                terminal = CFBridgingRelease(term);
-            sessionPid = pid;
-            done();
-        });
-    });
-    NSAssert(err <= 0, @"session start did not finish??");
-    if (err < 0)
-        return err;
-    self.sessionTerminal = terminal;
-    self.sessionPid = sessionPid;
-#endif
-    return 0;
+- (Terminal *)sessionTerminal {
+    return self.selectedSession.terminal;
 }
 
-#if !ISH_LINUX
-- (void)processExited:(NSNotification *)notif {
-    int pid = [notif.userInfo[@"pid"] intValue];
-    if (pid != self.sessionPid)
+#pragma mark Tabs
+
+- (void)setSelectedSession:(TerminalSession *)session {
+    NSAssert(session == nil || [self.tabs containsObject:session], @"selecting a session that is not a tab");
+    _selectedSession = session;
+    self.terminal = session.terminal;
+    [self tabsDidChange];
+}
+
+- (void)selectTabAtIndex:(NSUInteger)index {
+    if (index < self.tabs.count)
+        self.selectedSession = self.tabs[index];
+}
+
+- (void)selectNeighborTab:(NSInteger)offset {
+    if (self.tabs.count < 2)
         return;
+    NSInteger index = (NSInteger) [self.tabs indexOfObject:self.selectedSession];
+    NSInteger count = (NSInteger) self.tabs.count;
+    [self selectTabAtIndex:(NSUInteger) (((index + offset) % count + count) % count)];
+}
 
-    [self.sessionTerminal destroy];
-    // On iOS 13, there are multiple windows, so just close this one.
-    if (@available(iOS 13, *)) {
-        // On iPhone, destroying scenes will fail, but the error doesn't actually go to the error handler, which is really stupid. Apple doesn't fix bugs, so I'm forced to just add a check here.
-        if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad && self.sceneSession != nil) {
-            [UIApplication.sharedApplication requestSceneSessionDestruction:self.sceneSession options:nil errorHandler:^(NSError *error) {
-                NSLog(@"scene destruction error %@", error);
-                self.sceneSession = nil;
-                [self processExited:notif];
-            }];
+- (void)closeTab:(TerminalSession *)session {
+    NSUInteger index = [self.tabs indexOfObject:session];
+    if (index == NSNotFound)
+        return;
+    [self.tabs removeObjectAtIndex:index];
+    [TerminalSessionStore.shared closeSession:session];
+    if (self.tabs.count == 0) {
+        // A window with no shell in it is useless, so start a fresh one in place.
+        [self startNewSession];
+    } else if (session == self.selectedSession) {
+        [self selectTabAtIndex:MIN(index, self.tabs.count - 1)];
+    } else {
+        [self tabsDidChange];
+    }
+}
+
+- (void)sessionDidChange:(NSNotification *)notif {
+    TerminalSession *session = notif.object;
+    if (![self.tabs containsObject:session])
+        return;
+    if (session.state == TerminalSessionStateClosed) {
+        // Closed by someone else (another window, or the app delegate).
+        [self closeTab:session];
+        return;
+    }
+    if (session.state == TerminalSessionStateExited && self.tabs.count == 1) {
+        // The only shell exited: replace it, as the app has always done on iPhone, unless
+        // it died right after starting, which would just loop.
+        if ([NSDate.date timeIntervalSinceDate:session.startDate] > 1) {
+            [self closeTab:session];
             return;
         }
     }
-    current = NULL; // it's been freed
-    [self startNewSession];
+    [self tabsDidChange];
 }
-#endif
+
+// Called whenever the tab list, the selection or a tab's state/title changes.
+- (void)tabsDidChange {
+}
 
 #if ISH_LINUX
 - (void)kernelPanicked:(NSNotification *)notif {
@@ -507,19 +501,57 @@
                              modifierFlags:UIKeyModifierCommand
                                     action:@selector(showAbout:)
                       discoverabilityTitle:@"Settings"]];
+
+        [commands addObject:
+         [UIKeyCommand keyCommandWithInput:@"t"
+                             modifierFlags:UIKeyModifierCommand
+                                    action:@selector(newTab:)
+                      discoverabilityTitle:@"New Tab"]];
+        [commands addObject:
+         [UIKeyCommand keyCommandWithInput:@"w"
+                             modifierFlags:UIKeyModifierCommand
+                                    action:@selector(closeCurrentTab:)
+                      discoverabilityTitle:@"Close Tab"]];
+        [commands addObject:
+         [UIKeyCommand keyCommandWithInput:@"]"
+                             modifierFlags:UIKeyModifierCommand | UIKeyModifierShift
+                                    action:@selector(nextTab:)
+                      discoverabilityTitle:@"Next Tab"]];
+        [commands addObject:
+         [UIKeyCommand keyCommandWithInput:@"["
+                             modifierFlags:UIKeyModifierCommand | UIKeyModifierShift
+                                    action:@selector(previousTab:)
+                      discoverabilityTitle:@"Previous Tab"]];
+        for (unsigned i = 1; i <= 9; i++) {
+            [commands addObject:
+             [UIKeyCommand keyCommandWithInput:[NSString stringWithFormat:@"%d", i]
+                                 modifierFlags:UIKeyModifierCommand
+                                        action:@selector(selectTabByNumber:)]];
+        }
     }
     return commands;
+}
+
+- (void)newTab:(UIKeyCommand *)command {
+    [self startNewSession];
+}
+- (void)closeCurrentTab:(UIKeyCommand *)command {
+    if (self.selectedSession != nil)
+        [self closeTab:self.selectedSession];
+}
+- (void)nextTab:(UIKeyCommand *)command {
+    [self selectNeighborTab:1];
+}
+- (void)previousTab:(UIKeyCommand *)command {
+    [self selectNeighborTab:-1];
+}
+- (void)selectTabByNumber:(UIKeyCommand *)command {
+    [self selectTabAtIndex:(NSUInteger) command.input.integerValue - 1];
 }
 
 - (void)setTerminal:(Terminal *)terminal {
     _terminal = terminal;
     self.termView.terminal = self.terminal;
-}
-
-- (void)setSessionTerminal:(Terminal *)sessionTerminal {
-    if (_terminal == _sessionTerminal)
-        self.terminal = sessionTerminal;
-    _sessionTerminal = sessionTerminal;
 }
 
 @end

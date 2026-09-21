@@ -12,9 +12,12 @@
 
 @property (nonatomic) Terminal *terminal;
 
+// Opens a new shell in a new tab and selects it.
 - (void)startNewSession;
+// Adopts an existing session (e.g. after the window was reconnected); starts a new one if it no longer exists.
 - (void)reconnectSessionFromTerminalUUID:(NSUUID *)uuid;
-@property (readonly) NSUUID *sessionTerminalUUID; // 0 means invalid
+// UUID of the selected tab's session, nil if none.
+@property (readonly) NSUUID *sessionTerminalUUID;
 @property UISceneSession *sceneSession API_AVAILABLE(ios(13.0));
 
 @end
