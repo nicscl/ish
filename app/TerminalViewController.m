@@ -9,6 +9,7 @@
 #import "AppDelegate.h"
 #import "TerminalView.h"
 #import "TerminalSession.h"
+#import "TabBarView.h"
 #import "BarButton.h"
 #import "ArrowBarButton.h"
 #import "UserPreferences.h"
@@ -21,11 +22,13 @@
 #include "kernel/calls.h"
 #include "fs/devices.h"
 
-@interface TerminalViewController () <UIGestureRecognizerDelegate>
+@interface TerminalViewController () <UIGestureRecognizerDelegate, TabBarViewDelegate>
 
 @property UITapGestureRecognizer *tapRecognizer;
 @property (weak, nonatomic) IBOutlet TerminalView *termView;
 @property (weak, nonatomic) IBOutlet NSLayoutConstraint *bottomConstraint;
+@property (weak, nonatomic) IBOutlet NSLayoutConstraint *termTop;
+@property TabBarView *tabBar;
 
 @property (weak, nonatomic) IBOutlet UIButton *tabKey;
 @property (weak, nonatomic) IBOutlet UIButton *controlKey;
@@ -74,6 +77,19 @@
         NSLog(@"boot failed with code %d", bootError);
     }
 #endif
+
+    self.tabBar = [[TabBarView alloc] initWithFrame:CGRectZero];
+    self.tabBar.delegate = self;
+    self.tabBar.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:self.tabBar];
+    self.termTop.active = NO;
+    [NSLayoutConstraint activateConstraints:@[
+        [self.tabBar.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
+        [self.tabBar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.tabBar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.termView.topAnchor constraintEqualToAnchor:self.tabBar.bottomAnchor],
+    ]];
+    [self tabsDidChange];
 
     self.terminal = self.terminal;
     [self.termView becomeFirstResponder];
@@ -244,6 +260,42 @@
 
 // Called whenever the tab list, the selection or a tab's state/title changes.
 - (void)tabsDidChange {
+    NSUInteger selected = self.selectedSession ? [self.tabs indexOfObject:self.selectedSession] : NSNotFound;
+    [self.tabBar setSessions:self.tabs selectedIndex:selected];
+}
+
+- (void)tabBar:(TabBarView *)tabBar didSelectTabAtIndex:(NSUInteger)index {
+    [self selectTabAtIndex:index];
+    [self.termView becomeFirstResponder];
+}
+
+- (void)tabBar:(TabBarView *)tabBar didRequestCloseTabAtIndex:(NSUInteger)index {
+    if (index < self.tabs.count)
+        [self closeTab:self.tabs[index]];
+}
+
+- (void)tabBarDidRequestNewTab:(TabBarView *)tabBar {
+    [self startNewSession];
+    [self.termView becomeFirstResponder];
+}
+
+- (void)tabBar:(TabBarView *)tabBar didRequestRenameTabAtIndex:(NSUInteger)index {
+    if (index >= self.tabs.count)
+        return;
+    TerminalSession *session = self.tabs[index];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Rename Tab" message:nil preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.text = session.title;
+        textField.placeholder = session.displayTitle;
+        textField.clearButtonMode = UITextFieldViewModeWhileEditing;
+    }];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Rename" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        NSString *title = [alert.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+        session.title = title.length > 0 ? title : nil;
+        [self.termView becomeFirstResponder];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 #if ISH_LINUX
@@ -277,6 +329,8 @@
     NSTimeInterval duration = animated ? 0.1 : 0;
     [UIView animateWithDuration:duration animations:^{
         self.view.backgroundColor = [[UIColor alloc] ish_initWithHexString:UserPreferences.shared.palette.backgroundColor];
+        [self.tabBar setBackgroundColor:self.view.backgroundColor
+                        foregroundColor:[[UIColor alloc] ish_initWithHexString:UserPreferences.shared.palette.foregroundColor]];
         UIKeyboardAppearance keyAppearance = UserPreferences.shared.keyboardAppearance;
         self.termView.keyboardAppearance = keyAppearance;
         for (BarButton *button in self.barButtons) {

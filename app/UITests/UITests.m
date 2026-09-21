@@ -76,6 +76,30 @@
     [self waitForTerminalText:@"still-42" timeout:10];
 }
 
+// The tab strip: + opens a tab, tapping a tab selects it, x closes it.
+- (void)testTabStripTouch {
+    [self waitForTerminalText:@":~#" timeout:30];
+    XCUIElement *tabBar = self.app.otherElements[@"tab bar"];
+    XCTAssert([tabBar waitForExistenceWithTimeout:5]);
+    XCTAssert(self.app.buttons[@"tab 1"].exists);
+    XCTAssertFalse(self.app.buttons[@"tab 2"].exists);
+
+    [self.app.buttons[@"new tab"] tap];
+    XCTAssert([self.app.buttons[@"tab 2"] waitForExistenceWithTimeout:5]);
+    [self waitForTerminalText:@":~#" timeout:30];
+    [self.app typeText:@"echo in-tab-two\n"];
+    [self waitForTerminalText:@"in-tab-two" timeout:10];
+
+    [self.app.buttons[@"tab 1"] tap];
+    XCTAssert([[self terminalLinesContaining:@"in-tab-two"].firstMatch waitForNonExistenceWithTimeout:5]);
+    [self.app typeText:@"echo in-tab-one\n"];
+    [self waitForTerminalText:@"in-tab-one" timeout:10];
+
+    [self.app.buttons[@"close tab 2"] tap];
+    XCTAssert([self.app.buttons[@"tab 2"] waitForNonExistenceWithTimeout:5]);
+    [self waitForTerminalText:@"in-tab-one" timeout:5];
+}
+
 // When the only shell exits, a fresh one takes its place.
 - (void)testLastShellExitRestarts {
     [self waitForTerminalText:@":~#" timeout:30];

@@ -120,6 +120,7 @@
 		BB28C79526896B1F00BDC834 /* TerminalViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = BB792B571F96D90D00FFB7A4 /* TerminalViewController.m */; };
 		BB28C79626896B1F00BDC834 /* ProgressReportViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = BBAEE33B249BDADC0069EBB5 /* ProgressReportViewController.m */; };
 		869397023D38421482321635 /* TerminalSession.m in Sources */ = {isa = PBXBuildFile; fileRef = EA9B2EB67F8F46F5879B5A0A /* TerminalSession.m */; };
+		9579B14DD5DE4278B208142C /* TabBarView.m in Sources */ = {isa = PBXBuildFile; fileRef = 68D2CA8679F943DF899D0875 /* TabBarView.m */; };
 		BB28C79726896B1F00BDC834 /* TerminalView.m in Sources */ = {isa = PBXBuildFile; fileRef = BB78AB2A1FAD22440013E782 /* TerminalView.m */; };
 		BB28C79826896B1F00BDC834 /* ScrollbarView.m in Sources */ = {isa = PBXBuildFile; fileRef = BB23F58C231E1D1400585522 /* ScrollbarView.m */; };
 		BB28C79926896B1F00BDC834 /* DelayedUITask.m in Sources */ = {isa = PBXBuildFile; fileRef = BB455E101FB37F6600AFB48B /* DelayedUITask.m */; };
@@ -674,6 +675,8 @@
 		BB6DB260216435330047A611 /* libiconv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libiconv.tbd; path = usr/lib/libiconv.tbd; sourceTree = SDKROOT; };
 		7B2A71C5344045279B623756 /* TerminalSession.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TerminalSession.h; sourceTree = "<group>"; };
 		EA9B2EB67F8F46F5879B5A0A /* TerminalSession.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TerminalSession.m; sourceTree = "<group>"; };
+		873A025C581D462E8C6BF740 /* TabBarView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TabBarView.h; sourceTree = "<group>"; };
+		68D2CA8679F943DF899D0875 /* TabBarView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TabBarView.m; sourceTree = "<group>"; };
 		BB78AB291FAD22440013E782 /* TerminalView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TerminalView.h; sourceTree = "<group>"; };
 		BB78AB2A1FAD22440013E782 /* TerminalView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TerminalView.m; sourceTree = "<group>"; };
 		BB792B501F96D90D00FFB7A4 /* iSH.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iSH.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1062,6 +1065,8 @@
 				BBFB557D21587B2B00DFE6DE /* Bar */,
 				7B2A71C5344045279B623756 /* TerminalSession.h */,
 				EA9B2EB67F8F46F5879B5A0A /* TerminalSession.m */,
+				873A025C581D462E8C6BF740 /* TabBarView.h */,
+				68D2CA8679F943DF899D0875 /* TabBarView.m */,
 				BB78AB291FAD22440013E782 /* TerminalView.h */,
 				BB78AB2A1FAD22440013E782 /* TerminalView.m */,
 				BB0FC5901F980A6B00803272 /* Terminal.h */,
@@ -2197,6 +2202,7 @@
 				BBC3863F276817AD00CC8C2E /* CurrentRoot.m in Sources */,
 				BB28C79626896B1F00BDC834 /* ProgressReportViewController.m in Sources */,
 				869397023D38421482321635 /* TerminalSession.m in Sources */,
+				9579B14DD5DE4278B208142C /* TabBarView.m in Sources */,
 				BB28C79726896B1F00BDC834 /* TerminalView.m in Sources */,
 				497A08BF29633FF400B323CF /* mach_exc.defs in Sources */,
 				BB28C79826896B1F00BDC834 /* ScrollbarView.m in Sources */,
