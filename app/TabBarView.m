@@ -5,9 +5,10 @@
 
 #import "TabBarView.h"
 
-static const CGFloat kTabHeight = 36;
-static const CGFloat kButtonWidth = 36;
-static const CGFloat kTabMaxWidth = 200;
+static const CGFloat kTabHeight = 44;
+static const CGFloat kButtonWidth = 44;
+static const CGFloat kTabMinWidth = 120;
+static const CGFloat kTabMaxWidth = 220;
 
 @interface TabItemView : UIControl
 @property (readonly) UILabel *label;
@@ -28,7 +29,9 @@ static const CGFloat kTabMaxWidth = 200;
         [self addSubview:_label];
 
         _closeButton = [UIButton buttonWithType:UIButtonTypeSystem];
-        [_closeButton setImage:[UIImage systemImageNamed:@"xmark"] forState:UIControlStateNormal];
+        [_closeButton setImage:[UIImage systemImageNamed:@"xmark"
+                                        withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightMedium]]
+                      forState:UIControlStateNormal];
         _closeButton.translatesAutoresizingMaskIntoConstraints = NO;
         _closeButton.accessibilityLabel = @"Close Tab";
         [self addSubview:_closeButton];
@@ -36,12 +39,13 @@ static const CGFloat kTabMaxWidth = 200;
         [NSLayoutConstraint activateConstraints:@[
             [_label.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:12],
             [_label.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
-            [_closeButton.leadingAnchor constraintEqualToAnchor:_label.trailingAnchor constant:4],
+            [_closeButton.leadingAnchor constraintEqualToAnchor:_label.trailingAnchor constant:8],
             [_closeButton.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-4],
             [_closeButton.topAnchor constraintEqualToAnchor:self.topAnchor],
             [_closeButton.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
             [_closeButton.widthAnchor constraintEqualToConstant:kButtonWidth],
             [self.widthAnchor constraintLessThanOrEqualToConstant:kTabMaxWidth],
+            [self.widthAnchor constraintGreaterThanOrEqualToConstant:kTabMinWidth],
         ]];
         self.layer.cornerRadius = 6;
         self.layer.cornerCurve = kCACornerCurveContinuous;
@@ -55,6 +59,7 @@ static const CGFloat kTabMaxWidth = 200;
 @property UIScrollView *scrollView;
 @property UIStackView *stack;
 @property UIButton *addTabButton;
+@property UIView *separator;
 @property UIColor *foreground;
 @property UIColor *background;
 @property NSUInteger selectedIndex;
@@ -69,7 +74,9 @@ static const CGFloat kTabMaxWidth = 200;
         self.accessibilityIdentifier = @"tab bar";
 
         _addTabButton = [UIButton buttonWithType:UIButtonTypeSystem];
-        [_addTabButton setImage:[UIImage systemImageNamed:@"plus"] forState:UIControlStateNormal];
+        [_addTabButton setImage:[UIImage systemImageNamed:@"plus"
+                                         withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightMedium]]
+                       forState:UIControlStateNormal];
         _addTabButton.accessibilityLabel = @"New Tab";
         _addTabButton.accessibilityIdentifier = @"new tab";
         _addTabButton.translatesAutoresizingMaskIntoConstraints = NO;
@@ -83,6 +90,10 @@ static const CGFloat kTabMaxWidth = 200;
         _scrollView.translatesAutoresizingMaskIntoConstraints = NO;
         [self addSubview:_scrollView];
 
+        _separator = [UIView new];
+        _separator.translatesAutoresizingMaskIntoConstraints = NO;
+        [self addSubview:_separator];
+
         _stack = [UIStackView new];
         _stack.axis = UILayoutConstraintAxisHorizontal;
         _stack.spacing = 4;
@@ -93,6 +104,10 @@ static const CGFloat kTabMaxWidth = 200;
         UILayoutGuide *frameGuide = _scrollView.frameLayoutGuide;
         [NSLayoutConstraint activateConstraints:@[
             [self.heightAnchor constraintEqualToConstant:kTabHeight + 8],
+            [_separator.leadingAnchor constraintEqualToAnchor:self.leadingAnchor],
+            [_separator.trailingAnchor constraintEqualToAnchor:self.trailingAnchor],
+            [_separator.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
+            [_separator.heightAnchor constraintEqualToConstant:1 / UIScreen.mainScreen.scale],
 
             [_scrollView.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:8],
             [_scrollView.topAnchor constraintEqualToAnchor:self.topAnchor constant:4],
@@ -102,7 +117,7 @@ static const CGFloat kTabMaxWidth = 200;
             [_addTabButton.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-8],
             [_addTabButton.topAnchor constraintEqualToAnchor:_scrollView.topAnchor],
             [_addTabButton.bottomAnchor constraintEqualToAnchor:_scrollView.bottomAnchor],
-            [_addTabButton.widthAnchor constraintEqualToConstant:kButtonWidth + 8],
+            [_addTabButton.widthAnchor constraintEqualToConstant:kButtonWidth],
 
             [_stack.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
             [_stack.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
@@ -157,14 +172,21 @@ static const CGFloat kTabMaxWidth = 200;
 }
 
 - (void)applyColors {
+    // A slightly tinted surface so the strip reads as chrome rather than terminal content.
+    UIColor *tint = [self.foreground colorWithAlphaComponent:0.05];
     self.backgroundColor = self.background;
-    UIColor *selectedBackground = [self.foreground colorWithAlphaComponent:0.18];
-    UIColor *dimText = [self.foreground colorWithAlphaComponent:0.6];
+    self.scrollView.backgroundColor = UIColor.clearColor;
+    self.separator.backgroundColor = [self.foreground colorWithAlphaComponent:0.25];
+    UIColor *selectedBackground = [self.foreground colorWithAlphaComponent:0.16];
+    UIColor *dimText = [self.foreground colorWithAlphaComponent:0.75];
     self.addTabButton.tintColor = self.foreground;
+    UIFont *regular = [UIFontMetrics.defaultMetrics scaledFontForFont:[UIFont systemFontOfSize:13]];
+    UIFont *semibold = [UIFontMetrics.defaultMetrics scaledFontForFont:[UIFont systemFontOfSize:13 weight:UIFontWeightSemibold]];
     [self.stack.arrangedSubviews enumerateObjectsUsingBlock:^(TabItemView *item, NSUInteger i, BOOL *stop) {
         BOOL selected = i == self.selectedIndex;
-        item.backgroundColor = selected ? selectedBackground : UIColor.clearColor;
+        item.backgroundColor = selected ? selectedBackground : tint;
         item.label.textColor = selected ? self.foreground : dimText;
+        item.label.font = selected ? semibold : regular;
         item.closeButton.tintColor = selected ? self.foreground : dimText;
     }];
 }
