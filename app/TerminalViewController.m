@@ -319,11 +319,13 @@
     [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
     __weak UIAlertController *weakAlert = alert;
     __weak TerminalViewController *weakSelf = self;
-    [alert addAction:[UIAlertAction actionWithTitle:@"Rename" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+    UIAlertAction *rename = [UIAlertAction actionWithTitle:@"Rename" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         NSString *title = [weakAlert.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
         session.title = title.length > 0 ? title : nil;
         [weakSelf.termView becomeFirstResponder];
-    }]];
+    }];
+    [alert addAction:rename];
+    alert.preferredAction = rename; // Return in the text field confirms
     [self presentViewController:alert animated:YES completion:nil];
 }
 
@@ -596,6 +598,11 @@
                                     action:@selector(closeCurrentTab:)
                       discoverabilityTitle:@"Close Tab"]];
         [commands addObject:
+         [UIKeyCommand keyCommandWithInput:@"i"
+                             modifierFlags:UIKeyModifierCommand
+                                    action:@selector(renameCurrentTab:)
+                      discoverabilityTitle:@"Rename Tab"]];
+        [commands addObject:
          [UIKeyCommand keyCommandWithInput:@"]"
                              modifierFlags:UIKeyModifierCommand | UIKeyModifierShift
                                     action:@selector(nextTab:)
@@ -625,6 +632,11 @@
 - (void)closeCurrentTab:(UIKeyCommand *)command {
     if (self.selectedSession != nil)
         [self closeTab:self.selectedSession];
+}
+- (void)renameCurrentTab:(UIKeyCommand *)command {
+    NSUInteger index = [self.tabs indexOfObject:self.selectedSession];
+    if (index != NSNotFound)
+        [self tabBar:self.tabBar didRequestRenameTabAtIndex:index];
 }
 - (void)nextTab:(UIKeyCommand *)command {
     [self selectNeighborTab:1];

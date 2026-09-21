@@ -309,6 +309,25 @@ void NetworkReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
     return YES;
 }
 
+// The main menu's Format menu binds Bold/Italic/Underline to Cmd+B/I/U. Those key
+// equivalents swallow the keys before any UIKeyCommand sees them, and a terminal
+// has no rich text anyway, so drop the menu and claim Cmd+I for Rename Tab in a
+// Tabs menu of our own, which also shows the shortcut in the iPadOS menu bar.
+- (void)buildMenuWithBuilder:(id<UIMenuBuilder>)builder {
+    [super buildMenuWithBuilder:builder];
+    if (builder.system != UIMenuSystem.mainSystem)
+        return;
+    [builder removeMenuForIdentifier:UIMenuFormat];
+    UIKeyCommand *rename = [UIKeyCommand commandWithTitle:@"Rename Tab"
+                                                    image:nil
+                                                   action:@selector(renameCurrentTab:)
+                                                    input:@"i"
+                                            modifierFlags:UIKeyModifierCommand
+                                             propertyList:nil];
+    UIMenu *tabs = [UIMenu menuWithTitle:@"Tabs" image:nil identifier:@"dev.nicholas.ish.menu.tabs" options:0 children:@[rename]];
+    [builder insertSiblingMenu:tabs afterMenuForIdentifier:UIMenuEdit];
+}
+
 - (void)application:(UIApplication *)application didDiscardSceneSessions:(NSSet<UISceneSession *> *)sceneSessions API_AVAILABLE(ios(13.0)) {
     for (UISceneSession *sceneSession in sceneSessions) {
         if (sceneSession.stateRestorationActivity == nil)

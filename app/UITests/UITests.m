@@ -130,6 +130,25 @@
     [self attachScreenshotNamed:@"ten tabs, first selected"];
 }
 
+// Cmd+I opens the rename dialog for the selected tab; Return confirms.
+// Verified on an iPad with a hardware keyboard: in the Simulator the Cmd+I press never
+// reaches the app at all (unlike Cmd+T/W), so the test only runs on a device.
+- (void)testRenameTabShortcut {
+#if TARGET_OS_SIMULATOR
+    XCTSkip(@"Cmd+I is swallowed by the Simulator before it reaches the app");
+#endif
+    [self waitForTerminalText:@":~#" timeout:30];
+    [self typeCommandKey:@"i"];
+    XCUIElement *alert = self.app.alerts[@"Rename Tab"];
+    XCTAssert([alert waitForExistenceWithTimeout:5]);
+    [self.app typeText:@"builds\n"];
+    XCTAssert([alert waitForNonExistenceWithTimeout:5]);
+    XCTAssertEqualObjects(self.app.buttons[@"tab 1"].label, @"builds");
+    // the terminal has focus again
+    [self.app typeText:@"echo renamed-$((6*7))\n"];
+    [self waitForTerminalText:@"renamed-42" timeout:10];
+}
+
 // When the only shell exits, a fresh one takes its place.
 - (void)testLastShellExitRestarts {
     [self waitForTerminalText:@":~#" timeout:30];
