@@ -21,6 +21,9 @@ struct rowcol {
 @property (nonatomic) NSMutableArray<UIKeyCommand *> *keyCommands;
 @property ScrollbarView *scrollbarView;
 @property (nonatomic) BOOL terminalFocused;
+// While the native scrollbar is being updated from the terminal's own scroll
+// state, its scroll events must not be sent back to the terminal.
+@property BOOL syncingScroll;
 
 @property (nullable) NSString *markedText;
 @property (nullable) NSString *selectedText;
@@ -120,8 +123,13 @@ static NSString *const HANDLERS[] = {@"syncFocus", @"focus", @"newScrollHeight",
     self.scrollbarView.contentView = webView;
     [self.scrollbarView addSubview:webView];
 
-    // Anything that happened while this terminal was detached (output, scrolling,
-    // focus changes) was not delivered to us, so pull the current state explicitly.
+    // The scrollbar still holds the previous terminal's metrics. Reset them without
+    // telling the new terminal, then ask it for its own state: anything that happened
+    // while it was detached (output, scrolling, focus changes) was not delivered to us.
+    self.syncingScroll = YES;
+    self.scrollbarView.contentSize = CGSizeZero;
+    self.scrollbarView.contentOffset = CGPointZero;
+    self.syncingScroll = NO;
     [webView evaluateJavaScript:@"exports.resyncScroll()" completionHandler:nil];
     self.terminalFocused = self.isFirstResponder;
 }
@@ -246,18 +254,25 @@ static NSString *const HANDLERS[] = {@"syncFocus", @"focus", @"newScrollHeight",
             [self becomeFirstResponder];
         }
     } else if ([message.name isEqualToString:@"newScrollHeight"]) {
+        // Changing the size can clamp the offset, which must not be echoed back as a scroll.
+        self.syncingScroll = YES;
         self.scrollbarView.contentSize = CGSizeMake(0, [message.body doubleValue]);
+        self.syncingScroll = NO;
     } else if ([message.name isEqualToString:@"newScrollTop"]) {
         CGFloat newOffset = [message.body doubleValue];
         if (self.scrollbarView.contentOffset.y == newOffset)
             return;
+        self.syncingScroll = YES;
         [self.scrollbarView setContentOffset:CGPointMake(0, newOffset) animated:NO];
+        self.syncingScroll = NO;
     } else if ([message.name isEqualToString:@"openLink"]) {
         [UIApplication openURL:message.body];
     }
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+    if (self.syncingScroll)
+        return;
     [self.terminal.webView evaluateJavaScript:[NSString stringWithFormat:@"exports.newScrollTop(%f)", scrollView.contentOffset.y] completionHandler:nil];
 }
 

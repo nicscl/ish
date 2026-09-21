@@ -39,6 +39,8 @@ typedef struct linux_tty *tty_t;
 @property (nonatomic) BOOL outputInProgress;
 // set by destroy (under dataLock for !linux); output is discarded from then on
 @property (nonatomic) BOOL destroyed;
+// set by hangup; the signals are only sent once
+@property (nonatomic) BOOL hungUp;
 
 @property DelayedUITask *refreshTask;
 @property DelayedUITask *scrollToBottomTask;
@@ -342,9 +344,23 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
 }
 
 - (void)hangup {
-    tty_t tty = self.tty;
-    if (tty != NULL) {
+    @synchronized (self) {
+        if (_hungUp)
+            return;
+        _hungUp = YES;
+    }
 #if !ISH_LINUX
+    // self.tty is a non-owning pointer that ios_tty_cleanup clears when the tty is
+    // freed; cleanup runs under ttys_lock, so take our own reference under it.
+    lock(&ttys_lock);
+    struct tty *tty = self.tty;
+    if (tty != NULL) {
+        lock(&tty->lock);
+        tty->refcount++;
+        unlock(&tty->lock);
+    }
+    unlock(&ttys_lock);
+    if (tty != NULL) {
         lock(&tty->lock);
         tty_hangup(tty);
         pid_t_ fg_group = tty->fg_group;
@@ -357,10 +373,15 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
             send_group_signal(fg_group, SIGHUP_, SIGINFO_NIL);
             send_group_signal(fg_group, SIGCONT_, SIGINFO_NIL);
         }
+        lock(&ttys_lock);
+        tty_release(tty);
+        unlock(&ttys_lock);
+    }
 #else
+    tty_t tty = self.tty;
+    if (tty != NULL)
         tty->ops->hangup(tty);
 #endif
-    }
     @synchronized (Terminal.class) {
         if ([terminals objectForKey:self.terminalsKey] == self)
             [terminals removeObjectForKey:self.terminalsKey];

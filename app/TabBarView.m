@@ -5,7 +5,8 @@
 
 #import "TabBarView.h"
 
-static const CGFloat kTabHeight = 32;
+static const CGFloat kTabHeight = 36;
+static const CGFloat kButtonWidth = 36;
 static const CGFloat kTabMaxWidth = 200;
 
 @interface TabItemView : UIControl
@@ -19,7 +20,8 @@ static const CGFloat kTabMaxWidth = 200;
 - (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
         _label = [UILabel new];
-        _label.font = [UIFont systemFontOfSize:13];
+        _label.font = [UIFontMetrics.defaultMetrics scaledFontForFont:[UIFont systemFontOfSize:13]];
+        _label.adjustsFontForContentSizeCategory = YES;
         _label.lineBreakMode = NSLineBreakByTruncatingTail;
         _label.translatesAutoresizingMaskIntoConstraints = NO;
         _label.userInteractionEnabled = NO;
@@ -38,7 +40,7 @@ static const CGFloat kTabMaxWidth = 200;
             [_closeButton.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-4],
             [_closeButton.topAnchor constraintEqualToAnchor:self.topAnchor],
             [_closeButton.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
-            [_closeButton.widthAnchor constraintEqualToConstant:28],
+            [_closeButton.widthAnchor constraintEqualToConstant:kButtonWidth],
             [self.widthAnchor constraintLessThanOrEqualToConstant:kTabMaxWidth],
         ]];
         self.layer.cornerRadius = 6;
@@ -100,7 +102,7 @@ static const CGFloat kTabMaxWidth = 200;
             [_addTabButton.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-8],
             [_addTabButton.topAnchor constraintEqualToAnchor:_scrollView.topAnchor],
             [_addTabButton.bottomAnchor constraintEqualToAnchor:_scrollView.bottomAnchor],
-            [_addTabButton.widthAnchor constraintEqualToConstant:36],
+            [_addTabButton.widthAnchor constraintEqualToConstant:kButtonWidth + 8],
 
             [_stack.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
             [_stack.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
@@ -137,8 +139,12 @@ static const CGFloat kTabMaxWidth = 200;
         item.label.text = title;
         item.accessibilityLabel = title;
         item.accessibilityIdentifier = [NSString stringWithFormat:@"tab %lu", (unsigned long) i + 1];
+        item.closeButton.accessibilityLabel = [NSString stringWithFormat:@"Close %@", session.displayTitle];
         item.closeButton.accessibilityIdentifier = [NSString stringWithFormat:@"close tab %lu", (unsigned long) i + 1];
         item.accessibilityTraits = i == selectedIndex ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
+        item.accessibilityCustomActions = @[
+            [[UIAccessibilityCustomAction alloc] initWithName:@"Rename" target:self selector:@selector(renameAction:)],
+        ];
     }];
     [self applyColors];
     [self scrollSelectedTabIntoView];
@@ -188,6 +194,16 @@ static const CGFloat kTabMaxWidth = 200;
         return;
     TabItemView *item = (TabItemView *) recognizer.view;
     [self.delegate tabBar:self didRequestRenameTabAtIndex:item.index];
+}
+
+- (BOOL)renameAction:(UIAccessibilityCustomAction *)action {
+    for (TabItemView *item in self.stack.arrangedSubviews) {
+        if ([item.accessibilityCustomActions containsObject:action]) {
+            [self.delegate tabBar:self didRequestRenameTabAtIndex:item.index];
+            return YES;
+        }
+    }
+    return NO;
 }
 
 - (void)newTabPressed:(UIButton *)button {

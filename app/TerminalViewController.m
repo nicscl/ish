@@ -85,8 +85,8 @@
     self.termTop.active = NO;
     [NSLayoutConstraint activateConstraints:@[
         [self.tabBar.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
-        [self.tabBar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.tabBar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.tabBar.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor],
+        [self.tabBar.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor],
         [self.termView.topAnchor constraintEqualToAnchor:self.tabBar.bottomAnchor],
     ]];
     [self tabsDidChange];
@@ -304,10 +304,12 @@
         textField.clearButtonMode = UITextFieldViewModeWhileEditing;
     }];
     [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    __weak UIAlertController *weakAlert = alert;
+    __weak TerminalViewController *weakSelf = self;
     [alert addAction:[UIAlertAction actionWithTitle:@"Rename" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        NSString *title = [alert.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+        NSString *title = [weakAlert.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
         session.title = title.length > 0 ? title : nil;
-        [self.termView becomeFirstResponder];
+        [weakSelf.termView becomeFirstResponder];
     }]];
     [self presentViewController:alert animated:YES completion:nil];
 }
