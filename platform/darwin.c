@@ -34,9 +34,9 @@ struct mem_usage get_mem_usage(void) {
 }
 
 struct uptime_info get_uptime(void) {
-    uint64_t kern_boottime[2];
-    size_t size = sizeof(kern_boottime);
-    sysctlbyname("kern.boottime", &kern_boottime, &size, NULL, 0);
+    struct timeval boottime;
+    size_t size = sizeof(boottime);
+    sysctlbyname("kern.boottime", &boottime, &size, NULL, 0);
     struct timeval now;
     gettimeofday(&now, NULL);
 
@@ -56,7 +56,8 @@ struct uptime_info get_uptime(void) {
     }
 
     struct uptime_info uptime = {
-        .uptime_ticks = now.tv_sec - kern_boottime[0],
+        // in hundredths of a second, as /proc/uptime expects
+        .uptime_ticks = (now.tv_sec - boottime.tv_sec) * 100 + (now.tv_usec - boottime.tv_usec) / 10000,
         .load_1m = vm_loadavg.ldavg[0],
         .load_5m = vm_loadavg.ldavg[1],
         .load_15m = vm_loadavg.ldavg[2],

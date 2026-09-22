@@ -44,7 +44,7 @@ struct uptime_info get_uptime() {
     struct sysinfo info;
     sysinfo(&info);
     struct uptime_info uptime = {
-        .uptime_ticks = info.uptime,
+        .uptime_ticks = info.uptime * 100, // hundredths of a second
         .load_1m = info.loads[0],
         .load_5m = info.loads[1],
         .load_15m = info.loads[2],
