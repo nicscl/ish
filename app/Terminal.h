@@ -44,6 +44,11 @@ struct tty;
 // writer waiting for it. For terminals nobody will look at again.
 - (void)destroy;
 
+// The process group that owns the terminal right now (0 if none), and a way to
+// signal it, e.g. to kill a job that ignores Ctrl+C.
+@property (readonly) int foregroundProcessGroup;
+- (void)sendSignalToForegroundJob:(int)signal;
+
 @property (readonly) WKWebView *webView;
 @property (nonatomic) BOOL enableVoiceOverAnnounce;
 // Use KVO on this

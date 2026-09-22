@@ -49,6 +49,56 @@ NSNotificationName const TerminalSessionDidChangeNotification = @"TerminalSessio
     return [NSString stringWithFormat:@"<TerminalSession %@ pid=%d state=%ld>", self.displayTitle, self.pid, (long) self.state];
 }
 
+- (NSString *)currentDirectory {
+#if !ISH_LINUX
+    if (self.state != TerminalSessionStateRunning)
+        return nil;
+    // login forks the shell, so the process that owns the terminal (the shell, or
+    // a job it started from the same directory) is the one to ask; the session's
+    // own process is login, whose directory never changes.
+    int fg_group = self.terminal.foregroundProcessGroup;
+    NSString *directory = nil;
+    lock(&pids_lock);
+    struct task *task = pid_get_task(fg_group != 0 ? fg_group : self.pid);
+    if (task != NULL && task->fs != NULL) {
+        char path[MAX_PATH + 1];
+        lock(&task->fs->lock);
+        int err = generic_getpath(task->fs->pwd, path);
+        unlock(&task->fs->lock);
+        if (err >= 0)
+            directory = [NSString stringWithUTF8String:path];
+    }
+    unlock(&pids_lock);
+    return directory;
+#else
+    return nil;
+#endif
+}
+
+- (BOOL)shellIsForeground {
+#if !ISH_LINUX
+    if (self.state != TerminalSessionStateRunning)
+        return NO;
+    // login forks the shell into its own process group, so the shell's pid is not
+    // known; go by what the foreground group's leader is running instead.
+    int fg_group = self.terminal.foregroundProcessGroup;
+    if (fg_group == 0)
+        return NO;
+    static NSSet<NSString *> *shells;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        shells = [NSSet setWithArray:@[@"sh", @"ash", @"bash", @"dash", @"zsh", @"fish", @"ksh", @"mksh", @"busybox"]];
+    });
+    lock(&pids_lock);
+    struct task *task = pid_get_task(fg_group);
+    NSString *comm = task != NULL ? [NSString stringWithUTF8String:task->comm] : nil;
+    unlock(&pids_lock);
+    return comm != nil && [shells containsObject:comm];
+#else
+    return YES; // can't tell, so don't get in the way
+#endif
+}
+
 @end
 
 @interface TerminalSessionStore ()

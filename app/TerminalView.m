@@ -381,8 +381,25 @@ static NSString *const HANDLERS[] = {@"syncFocus", @"focus", @"newScrollHeight",
     [self.terminal.webView evaluateJavaScript:@"exports.copy()" completionHandler:nil];
 }
 
-- (void)clearScrollback:(UIKeyCommand *)command {
+- (void)clearScrollback {
     [self.terminal.webView evaluateJavaScript:@"exports.clearScrollback()" completionHandler:nil];
+}
+
+- (void)clearScreen {
+    [self.terminal.webView evaluateJavaScript:@"exports.clearScreen()" completionHandler:nil];
+}
+
+- (void)resetTerminal {
+    // hterm's reset also drops the palette overrides the theme installed.
+    [self.terminal.webView evaluateJavaScript:@"exports.reset()" completionHandler:^(id result, NSError *error) {
+        [self _updateStyle];
+    }];
+}
+
+- (void)fetchTextWithCompletion:(void (^)(NSString *))completion {
+    [self.terminal.webView evaluateJavaScript:@"exports.getText()" completionHandler:^(id result, NSError *error) {
+        completion([result isKindOfClass:NSString.class] ? result : @"");
+    }];
 }
 
 #pragma mark Floating cursor
@@ -582,10 +599,6 @@ static const char *metaKeys = "abcdefghijklmnopqrstuvwxyz0123456789-=[]\\;',./";
     if (UserPreferences.shared.backtickMapEscape) {
         [self addKey:@"`" withModifiers:0];
     }
-    [_keyCommands addObject:[UIKeyCommand keyCommandWithInput:@"k"
-                                                modifierFlags:UIKeyModifierCommand|UIKeyModifierShift
-                                                       action:@selector(clearScrollback:)
-                                         discoverabilityTitle:@"Clear Scrollback"]];
     return _keyCommands;
 }
 

@@ -343,15 +343,10 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
     }
 }
 
-- (void)hangup {
-    @synchronized (self) {
-        if (_hungUp)
-            return;
-        _hungUp = YES;
-    }
 #if !ISH_LINUX
-    // self.tty is a non-owning pointer that ios_tty_cleanup clears when the tty is
-    // freed; cleanup runs under ttys_lock, so take our own reference under it.
+// self.tty is a non-owning pointer that ios_tty_cleanup clears when the tty is
+// freed; cleanup runs under ttys_lock, so take our own reference under it.
+- (struct tty *)retainTty {
     lock(&ttys_lock);
     struct tty *tty = self.tty;
     if (tty != NULL) {
@@ -360,6 +355,47 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
         unlock(&tty->lock);
     }
     unlock(&ttys_lock);
+    return tty;
+}
+
+- (void)releaseTty:(struct tty *)tty {
+    lock(&ttys_lock);
+    tty_release(tty);
+    unlock(&ttys_lock);
+}
+#endif
+
+- (int)foregroundProcessGroup {
+#if !ISH_LINUX
+    struct tty *tty = [self retainTty];
+    if (tty == NULL)
+        return 0;
+    lock(&tty->lock);
+    pid_t_ fg_group = tty->fg_group;
+    unlock(&tty->lock);
+    [self releaseTty:tty];
+    return fg_group;
+#else
+    return 0;
+#endif
+}
+
+- (void)sendSignalToForegroundJob:(int)signal {
+#if !ISH_LINUX
+    int fg_group = self.foregroundProcessGroup;
+    if (fg_group != 0)
+        send_group_signal(fg_group, signal, SIGINFO_NIL);
+#endif
+}
+
+- (void)hangup {
+    @synchronized (self) {
+        if (_hungUp)
+            return;
+        _hungUp = YES;
+    }
+#if !ISH_LINUX
+    struct tty *tty = [self retainTty];
     if (tty != NULL) {
         lock(&tty->lock);
         tty_hangup(tty);
@@ -373,9 +409,7 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
             send_group_signal(fg_group, SIGHUP_, SIGINFO_NIL);
             send_group_signal(fg_group, SIGCONT_, SIGINFO_NIL);
         }
-        lock(&ttys_lock);
-        tty_release(tty);
-        unlock(&ttys_lock);
+        [self releaseTty:tty];
     }
 #else
     tty_t tty = self.tty;

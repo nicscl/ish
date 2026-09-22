@@ -19,6 +19,7 @@
 #import "SceneDelegate.h"
 #import "PasteboardDevice.h"
 #import "LocationDevice.h"
+#import "MainMenu.h"
 #import "NSObject+SaneKVO.h"
 #import "Roots.h"
 #import "TerminalViewController.h"
@@ -309,31 +310,65 @@ void NetworkReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
     return YES;
 }
 
-// The main menu's Format menu binds Bold/Italic/Underline to Cmd+B/I/U. Those key
-// equivalents swallow the keys before any UIKeyCommand sees them, and a terminal
-// has no rich text anyway, so drop the menu and claim Cmd+I for Rename Tab in a
-// Tabs menu of our own, which also shows the shortcut in the iPadOS menu bar.
 - (void)buildMenuWithBuilder:(id<UIMenuBuilder>)builder {
     [super buildMenuWithBuilder:builder];
     if (builder.system != UIMenuSystem.mainSystem)
         return;
-    [builder removeMenuForIdentifier:UIMenuFormat];
-    UIKeyCommand *rename = [UIKeyCommand commandWithTitle:@"Rename Tab"
-                                                    image:nil
-                                                   action:@selector(renameCurrentTab:)
-                                                    input:@"i"
-                                            modifierFlags:UIKeyModifierCommand
-                                             propertyList:nil];
-    UIMenu *tabs = [UIMenu menuWithTitle:@"Tabs" image:nil identifier:@"dev.nicholas.ish.menu.tabs" options:0 children:@[rename]];
-    [builder insertSiblingMenu:tabs afterMenuForIdentifier:UIMenuEdit];
+    [MainMenu buildWithBuilder:builder];
+}
+
+#pragma mark Command routing
+
+// Menu items and key commands are sent to the first responder and up its chain.
+// While the terminal has the keyboard that chain includes the terminal view
+// controller, but with the keyboard dismissed nothing is first responder, the
+// window is, and the controller would be skipped. Being the end of every chain,
+// the app delegate hands such commands to the active window's controller.
+- (TerminalViewController *)terminalTargetForAction:(SEL)action sender:(id)sender {
+    TerminalViewController *vc = currentTerminalViewController;
+    if (vc == nil || vc.presentedViewController != nil)
+        return nil;
+    if (![vc canPerformAction:action withSender:sender])
+        return nil;
+    return vc;
+}
+
+- (BOOL)canPerformAction:(SEL)action withSender:(id)sender {
+    return [super canPerformAction:action withSender:sender] || [self terminalTargetForAction:action sender:sender] != nil;
+}
+
+- (id)targetForAction:(SEL)action withSender:(id)sender {
+    return [super targetForAction:action withSender:sender] ?: [self terminalTargetForAction:action sender:sender];
+}
+
+- (void)validateCommand:(UICommand *)command {
+    TerminalViewController *vc = [self terminalTargetForAction:command.action sender:command];
+    if (vc != nil)
+        [vc validateCommand:command];
+    else
+        [super validateCommand:command];
+}
+
+- (id)forwardingTargetForSelector:(SEL)selector {
+    TerminalViewController *vc = currentTerminalViewController;
+    if (vc != nil && [vc respondsToSelector:selector])
+        return vc;
+    return [super forwardingTargetForSelector:selector];
 }
 
 - (void)application:(UIApplication *)application didDiscardSceneSessions:(NSSet<UISceneSession *> *)sceneSessions API_AVAILABLE(ios(13.0)) {
+    // Tabs can be moved between windows, so a session listed by a discarded window
+    // may live on in another one; only sessions no window shows are closed.
+    NSMutableSet<NSUUID *> *shown = [NSMutableSet new];
+    for (TerminalViewController *vc in ConnectedTerminalViewControllers())
+        [shown addObjectsFromArray:vc.tabTerminalUUIDs];
     for (UISceneSession *sceneSession in sceneSessions) {
         if (sceneSession.stateRestorationActivity == nil)
             continue;
         TerminalSessionStore *store = TerminalSessionStore.shared;
         for (NSUUID *uuid in SceneTerminalUUIDs(sceneSession.stateRestorationActivity)) {
+            if ([shown containsObject:uuid])
+                continue;
             TerminalSession *session = [store sessionWithUUID:uuid];
             if (session != nil)
                 [store closeSession:session];

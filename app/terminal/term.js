@@ -167,6 +167,9 @@ exports.getCharacterSize = () => {
 };
 
 exports.clearScrollback = () => term.clearScrollback();
+exports.clearScreen = () => term.wipeContents();
+exports.reset = () => term.reset();
+exports.getText = () => term.getRowsText(0, term.getRowCount());
 exports.setUserGesture = () => term.accessibilityReader_.hasUserGesture = true;
 
 hterm.openUrl = (url) => native.openLink(url);

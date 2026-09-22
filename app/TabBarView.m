@@ -145,6 +145,7 @@ static UIFont *TabFont(void) {
 @property TabScrollView *scrollView;
 @property UIStackView *stack;
 @property UIButton *addTabButton;
+@property UIButton *commandsButton;
 @property UIView *bottomRule;
 @property NSLayoutConstraint *heightConstraint;
 @property NSLayoutConstraint *fillWidthConstraint;
@@ -184,6 +185,24 @@ static UIFont *TabFont(void) {
         [_addTabButton addTarget:self action:@selector(newTabPressed:) forControlEvents:UIControlEventPrimaryActionTriggered];
         [self addSubview:_addTabButton];
 
+        // Every command the app has, for people without a keyboard.
+        _commandsButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        [_commandsButton setImage:[UIImage systemImageNamed:@"ellipsis"
+                                           withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightMedium]]
+                         forState:UIControlStateNormal];
+        _commandsButton.accessibilityLabel = @"Commands";
+        _commandsButton.accessibilityIdentifier = @"commands";
+        _commandsButton.translatesAutoresizingMaskIntoConstraints = NO;
+        _commandsButton.pointerInteractionEnabled = YES;
+        _commandsButton.showsMenuAsPrimaryAction = YES;
+        __weak TabBarView *weakSelf = self;
+        _commandsButton.menu = [UIMenu menuWithChildren:@[
+            [UIDeferredMenuElement elementWithUncachedProvider:^(void (^completion)(NSArray<UIMenuElement *> *)) {
+                completion([weakSelf.delegate commandsMenuForTabBar:weakSelf].children ?: @[]);
+            }],
+        ]];
+        [self addSubview:_commandsButton];
+
         _scrollView = [TabScrollView new];
         _scrollView.showsHorizontalScrollIndicator = NO;
         _scrollView.showsVerticalScrollIndicator = NO;
@@ -217,10 +236,15 @@ static UIFont *TabFont(void) {
             [_scrollView.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
             [_scrollView.trailingAnchor constraintEqualToAnchor:_addTabButton.leadingAnchor],
 
-            [_addTabButton.trailingAnchor constraintEqualToAnchor:self.safeAreaLayoutGuide.trailingAnchor],
+            [_addTabButton.trailingAnchor constraintEqualToAnchor:_commandsButton.leadingAnchor],
             [_addTabButton.topAnchor constraintEqualToAnchor:_scrollView.topAnchor],
             [_addTabButton.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
             [_addTabButton.widthAnchor constraintEqualToConstant:kSlotWidth],
+
+            [_commandsButton.trailingAnchor constraintEqualToAnchor:self.safeAreaLayoutGuide.trailingAnchor],
+            [_commandsButton.topAnchor constraintEqualToAnchor:_scrollView.topAnchor],
+            [_commandsButton.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
+            [_commandsButton.widthAnchor constraintEqualToConstant:kSlotWidth],
 
             [_stack.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
             [_stack.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
@@ -330,6 +354,7 @@ static UIFont *TabFont(void) {
     self.scrollView.backgroundColor = UIColor.clearColor;
     self.bottomRule.backgroundColor = rule;
     self.addTabButton.tintColor = dimText;
+    self.commandsButton.tintColor = dimText;
     BOOL showHints = self.hardwareKeyboard && self.traitCollection.horizontalSizeClass == UIUserInterfaceSizeClassRegular;
     NSUInteger count = self.stack.arrangedSubviews.count;
     [self.stack.arrangedSubviews enumerateObjectsUsingBlock:^(TabItemView *item, NSUInteger i, BOOL *stop) {
@@ -368,7 +393,7 @@ static UIFont *TabFont(void) {
 // Fill mode: tabs share the strip equally. Scroll mode: fixed-width tabs, strip scrolls.
 - (void)updateLayoutMode {
     NSUInteger count = self.stack.arrangedSubviews.count;
-    CGFloat available = self.bounds.size.width - self.safeAreaInsets.left - self.safeAreaInsets.right - kSlotWidth;
+    CGFloat available = self.bounds.size.width - self.safeAreaInsets.left - self.safeAreaInsets.right - 2 * kSlotWidth;
     CGFloat minimum = self.minimumTabWidth;
     BOOL fill = count == 0 || available <= 0 || available / count >= minimum;
     BOOL changed = fill != self.fillMode;

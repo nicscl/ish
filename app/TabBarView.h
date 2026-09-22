@@ -20,6 +20,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)tabBar:(TabBarView *)tabBar didRequestCloseOtherTabsAtIndex:(NSUInteger)index;
 - (void)tabBar:(TabBarView *)tabBar didRequestRenameTabAtIndex:(NSUInteger)index;
 - (void)tabBarDidRequestNewTab:(TabBarView *)tabBar;
+// The menu behind the strip's ⋯ button; asked for each time it opens.
+- (nullable UIMenu *)commandsMenuForTabBar:(TabBarView *)tabBar;
 @end
 
 @interface TabBarView : UIView

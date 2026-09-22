@@ -123,6 +123,13 @@ void iosfs_init(void) {
     sync_bookmarks();
 }
 
+NSArray<NSString *> *iosfs_mount_points(void) {
+    // The persisted copy is kept in step with the live dictionary on every mount and
+    // unmount, and unlike the dictionary it is safe to read from any thread.
+    NSDictionary *bookmarks = [NSUserDefaults.standardUserDefaults dictionaryForKey:kMountBookmarks];
+    return [bookmarks.allKeys sortedArrayUsingSelector:@selector(compare:)];
+}
+
 void iosfs_clear_all_bookmarks(void) {
     [ios_mount_bookmarks removeAllObjects];
     sync_bookmarks();

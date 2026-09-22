@@ -29,4 +29,11 @@ enum OverrideAppearance {
 
 @property (nonatomic) Terminal *terminal;
 
+// Screen housekeeping, for the menu commands.
+- (void)clearScreen; // screen and scrollback
+- (void)clearScrollback;
+- (void)resetTerminal; // full VT reset, then the theme is reapplied
+// Everything in the scrollback and on screen, as text.
+- (void)fetchTextWithCompletion:(void (^)(NSString *text))completion;
+
 @end

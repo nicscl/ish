@@ -169,6 +169,100 @@
     [self addAttachment:attachment];
 }
 
+#pragma mark Commands menu
+
+// A menu item, whichever accessibility type UIKit gives it.
+- (XCUIElement *)menuItem:(NSString *)title {
+    return self.app.collectionViews.buttons[title];
+}
+
+// Opens the tab strip's ⋯ menu and follows the given path of items, tapping each.
+- (void)chooseCommand:(NSArray<NSString *> *)path {
+    XCUIElement *commands = self.app.buttons[@"commands"];
+    XCTAssert([commands waitForExistenceWithTimeout:5], @"the tab strip should have a commands button");
+    [commands tap];
+    for (NSString *title in path) {
+        XCUIElement *item = [self menuItem:title];
+        XCTAssert([item waitForExistenceWithTimeout:5], @"menu item %@ should exist", title);
+        [item tap];
+    }
+}
+
+// The ⋯ button offers every command by touch: New Tab opens a second shell.
+- (void)testCommandsMenuNewTab {
+    [self waitForTerminalText:@":~#" timeout:30];
+    // Keep a look at the menu itself in the result bundle.
+    [self chooseCommand:@[]];
+    XCTAssert([[self menuItem:@"Shell"] waitForExistenceWithTimeout:5]);
+    [self attachScreenshotNamed:@"commands menu"];
+    [[self menuItem:@"Tabs"] tap];
+    XCTAssert([[self menuItem:@"Next Tab"] waitForExistenceWithTimeout:5]);
+    [self attachScreenshotNamed:@"tabs submenu"];
+    // A tap well away from the menu (which hangs off the top-right corner) dismisses it.
+    [[self.app.webViews.firstMatch coordinateWithNormalizedOffset:CGVectorMake(0.1, 0.9)] tap];
+    XCTAssert([[self menuItem:@"Next Tab"] waitForNonExistenceWithTimeout:5]);
+
+    [self chooseCommand:@[@"New Tab"]];
+    XCTAssert([self.app.buttons[@"tab 2"] waitForExistenceWithTimeout:5]);
+    [self waitForTerminalText:@":~#" timeout:30];
+    [self.app typeText:@"echo in-new-tab-$((6*7))\n"];
+    [self waitForTerminalText:@"in-new-tab-42" timeout:10];
+}
+
+// Shell › Duplicate Tab starts the new shell in the current one's directory.
+- (void)testDuplicateTabKeepsDirectory {
+    [self waitForTerminalText:@":~#" timeout:30];
+    [self.app typeText:@"cd /tmp\n"];
+    [self waitForTerminalText:@":/tmp#" timeout:10];
+    [self chooseCommand:@[@"Shell", @"Duplicate Tab"]];
+    XCTAssert([self.app.buttons[@"tab 2"] waitForExistenceWithTimeout:5]);
+    [self.app typeText:@"echo dup-$PWD-$((6*7))\n"];
+    [self waitForTerminalText:@"dup-/tmp-42" timeout:30];
+}
+
+// Shell › Send › Interrupt stops the foreground job like Ctrl+C would.
+- (void)testSendInterrupt {
+    [self waitForTerminalText:@":~#" timeout:30];
+    [self.app typeText:@"sleep 60\n"];
+    sleep(1);
+    [self chooseCommand:@[@"Shell", @"Send", @"Interrupt (Ctrl+C)"]];
+    [self.app typeText:@"echo after-interrupt-$((6*7))\n"];
+    [self waitForTerminalText:@"after-interrupt-42" timeout:10];
+}
+
+// A saved command runs in the current shell when it is at its prompt, and is offered
+// a new tab when a job is in the foreground.
+- (void)testSavedCommands {
+    // Saved commands persist in the app's defaults, so a name a previous run may have left behind must not collide.
+    NSString *name = [NSString stringWithFormat:@"Marker %u", arc4random_uniform(100000)];
+    [self waitForTerminalText:@":~#" timeout:30];
+    [self chooseCommand:@[@"Tools", @"Saved Commands", @"Add Saved Command…"]];
+    XCUIElement *alert = self.app.alerts[@"Add Saved Command"];
+    XCTAssert([alert waitForExistenceWithTimeout:5]);
+    [[alert.textFields elementBoundByIndex:0] tap];
+    [self.app typeText:name];
+    [[alert.textFields elementBoundByIndex:1] tap];
+    [self.app typeText:@"echo saved-$((6*7))"];
+    [alert.buttons[@"Add"] tap];
+    XCTAssert([alert waitForNonExistenceWithTimeout:5]);
+
+    [self chooseCommand:@[@"Tools", @"Saved Commands", name]];
+    [self waitForTerminalText:@"saved-42" timeout:10];
+
+    [self.app typeText:@"clear; sleep 60\n"];
+    sleep(1);
+    [self chooseCommand:@[@"Tools", @"Saved Commands", name]];
+    XCUIElement *busy = self.app.alerts.firstMatch;
+    XCTAssert([busy waitForExistenceWithTimeout:5], @"a busy shell should offer a new tab");
+    [busy.buttons[@"Run in New Tab"] tap];
+    XCTAssert([self.app.buttons[@"tab 2"] waitForExistenceWithTimeout:5]);
+    [self waitForTerminalText:@"saved-42" timeout:30];
+
+    [self chooseCommand:@[@"Tools", @"Saved Commands", @"Remove", name]];
+    [self chooseCommand:@[@"Tools", @"Saved Commands"]];
+    XCTAssertFalse([self menuItem:name].exists, @"the removed command should be gone from the menu");
+}
+
 - (void)testShellRunsCommands {
     [self waitForTerminalText:@":~#" timeout:30];
     [self.app typeText:@"echo smoke-$((6*7)); uname -m\n"];

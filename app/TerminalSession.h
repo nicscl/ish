@@ -31,6 +31,13 @@ typedef NS_ENUM(NSInteger, TerminalSessionState) {
 @property (nonatomic, copy, nullable) NSString *title;
 @property (readonly) NSString *displayTitle;
 
+// The shell's working directory, or nil if it cannot be determined (e.g. after
+// the shell exited).
+@property (readonly, nullable) NSString *currentDirectory;
+// Whether a shell, rather than a job like vim or ssh, owns the terminal: typed
+// text goes to a prompt.
+@property (readonly) BOOL shellIsForeground;
+
 @end
 
 // Posted on the main thread with the session as the object whenever its state

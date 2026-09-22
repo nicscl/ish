@@ -12,8 +12,22 @@ TerminalViewController *currentTerminalViewController = NULL;
 
 // Restoration activity keys. TerminalUUID is the selected tab and what versions
 // without tabs stored; TerminalUUIDs is the ordered list of all tabs.
+NSString *const SceneActivityType = @"app.ish.scene";
 NSString *const SceneTerminalUUIDKey = @"TerminalUUID";
 NSString *const SceneTerminalUUIDsKey = @"TerminalUUIDs";
+
+NSArray<TerminalViewController *> *ConnectedTerminalViewControllers(void) {
+    NSMutableArray<TerminalViewController *> *controllers = [NSMutableArray new];
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:UIWindowScene.class])
+            continue;
+        for (UIWindow *window in ((UIWindowScene *) scene).windows) {
+            if ([window.rootViewController isKindOfClass:TerminalViewController.class])
+                [controllers addObject:(TerminalViewController *) window.rootViewController];
+        }
+    }
+    return controllers;
+}
 
 NSArray<NSUUID *> *SceneTerminalUUIDs(NSUserActivity *activity) {
     NSMutableArray<NSUUID *> *uuids = [NSMutableArray new];
@@ -46,6 +60,13 @@ NSArray<NSUUID *> *SceneTerminalUUIDs(NSUserActivity *activity) {
     vc.sceneSession = session;
     NSUserActivity *activity = session.stateRestorationActivity;
     if (activity == nil) {
+        // A window opened by "Move Tab to New Window" brings its tab along.
+        for (NSUserActivity *requested in connectionOptions.userActivities) {
+            if ([requested.activityType isEqualToString:SceneActivityType])
+                activity = requested;
+        }
+    }
+    if (activity == nil) {
         [vc startNewSession];
     } else {
         NSString *selected = activity.userInfo[SceneTerminalUUIDKey];
@@ -55,7 +76,7 @@ NSArray<NSUUID *> *SceneTerminalUUIDs(NSUserActivity *activity) {
 }
 
 - (NSUserActivity *)stateRestorationActivityForScene:(UIScene *)scene {
-    NSUserActivity *activity = [[NSUserActivity alloc] initWithActivityType:@"app.ish.scene"];
+    NSUserActivity *activity = [[NSUserActivity alloc] initWithActivityType:SceneActivityType];
     TerminalViewController *vc = (TerminalViewController *) self.window.rootViewController;
     if ([vc isKindOfClass:TerminalViewController.class]) {
         NSMutableArray<NSString *> *uuids = [NSMutableArray new];
