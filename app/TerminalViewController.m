@@ -11,6 +11,7 @@
 #import "TerminalSession.h"
 #import "TabBarView.h"
 #import "MainMenu.h"
+#import "BackgroundKeepAlive.h"
 #import "SceneDelegate.h"
 #import "BarButton.h"
 #import "ArrowBarButton.h"
@@ -637,6 +638,9 @@ static NSString *ShellQuoted(NSString *string) {
         command.state = prefs.hideExtraKeysWithExternalKeyboard ? UIMenuElementStateOff : UIMenuElementStateOn;
     } else if (action == @selector(toggleStatusBar:)) {
         command.state = prefs.hideStatusBar ? UIMenuElementStateOn : UIMenuElementStateOff;
+    } else if (action == @selector(toggleKeepAlive:)) {
+        BackgroundKeepAlive *keepAlive = BackgroundKeepAlive.shared;
+        command.state = keepAlive.enabled && !keepAlive.denied ? UIMenuElementStateOn : UIMenuElementStateOff;
     } else if (action == @selector(switchTerminal:)) {
         int number = [command.propertyList intValue];
         BOOL current = number == 7 ? self.terminal == self.sessionTerminal
@@ -770,6 +774,23 @@ static NSString *ShellQuoted(NSString *string) {
 }
 - (void)toggleStatusBar:(id)sender {
     UserPreferences.shared.hideStatusBar = !UserPreferences.shared.hideStatusBar;
+}
+
+- (void)toggleKeepAlive:(id)sender {
+    BackgroundKeepAlive *keepAlive = BackgroundKeepAlive.shared;
+    if (keepAlive.denied) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Location Access Needed"
+                                                                       message:@"iSH stays running in the background by receiving coarse location updates. Allow location access for iSH in Settings."
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Open Settings" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            [UIApplication.sharedApplication openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString] options:@{} completionHandler:nil];
+        }]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        keepAlive.enabled = YES;
+        return;
+    }
+    keepAlive.enabled = !keepAlive.enabled;
 }
 
 #pragma mark Tabs menu

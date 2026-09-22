@@ -204,6 +204,9 @@ static UIMenu *ToolsMenu(void) {
         Group(@"tools.directory", @[
             Cmd(@"Copy Working Directory", @"doc.on.doc", @selector(copyCurrentDirectory:), nil),
         ]),
+        Group(@"tools.background", @[
+            Cmd(@"Keep Running in Background", @"location", @selector(toggleKeepAlive:), nil),
+        ]),
         Group(@"tools.saved", @[
             DynamicSubmenu(@"Saved Commands", @"bolt", @"savedcommands", ^{ return SavedCommandItems(); }),
         ]),

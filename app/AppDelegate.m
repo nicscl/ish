@@ -20,6 +20,7 @@
 #import "PasteboardDevice.h"
 #import "LocationDevice.h"
 #import "MainMenu.h"
+#import "BackgroundKeepAlive.h"
 #import "NSObject+SaneKVO.h"
 #import "Roots.h"
 #import "TerminalViewController.h"
@@ -257,6 +258,9 @@ void NetworkReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
 
     if ([NSUserDefaults.standardUserDefaults boolForKey:@"FASTLANE_SNAPSHOT"])
         [UIView setAnimationsEnabled:NO];
+
+    // Resumes location updates if the keep-alive was left on.
+    [BackgroundKeepAlive shared];
 
 #if !ISH_LINUX
     NSString *ishVersion = [NSString stringWithFormat:@"iSH %@ (%@)",
