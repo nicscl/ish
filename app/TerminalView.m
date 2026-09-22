@@ -16,7 +16,7 @@ struct rowcol {
     int col;
 };
 
-@interface TerminalView ()
+@interface TerminalView () <UIGestureRecognizerDelegate>
 
 @property (nonatomic) NSMutableArray<UIKeyCommand *> *keyCommands;
 @property ScrollbarView *scrollbarView;
@@ -51,6 +51,13 @@ struct rowcol {
     scrollbarView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     scrollbarView.bounces = NO;
     [self addSubview:scrollbarView];
+
+    // Cmd-click opens links. The web view doesn't reliably pass Cmd through to
+    // the page, so the modifier is read here.
+    UITapGestureRecognizer *linkClick = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(linkClicked:)];
+    linkClick.cancelsTouchesInView = NO;
+    linkClick.delegate = self;
+    [self addGestureRecognizer:linkClick];
 
     UserPreferences *prefs = UserPreferences.shared;
     [prefs observe:@[@"capsLockMapping", @"optionMapping", @"backtickMapEscape", @"overrideControlSpace"]
@@ -268,6 +275,20 @@ static NSString *const HANDLERS[] = {@"syncFocus", @"focus", @"newScrollHeight",
     } else if ([message.name isEqualToString:@"openLink"]) {
         [UIApplication openURL:message.body];
     }
+}
+
+- (void)linkClicked:(UITapGestureRecognizer *)recognizer {
+    if (!(recognizer.modifierFlags & UIKeyModifierCommand))
+        return;
+    WKWebView *webView = self.terminal.webView;
+    if (webView.superview == nil)
+        return;
+    CGPoint point = [recognizer locationInView:webView];
+    [webView evaluateJavaScript:[NSString stringWithFormat:@"exports.openLinkAt(%f, %f)", point.x, point.y] completionHandler:nil];
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    return YES;
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {

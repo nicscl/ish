@@ -172,7 +172,68 @@ exports.reset = () => term.reset();
 exports.getText = () => term.getRowsText(0, term.getRowCount());
 exports.setUserGesture = () => term.accessibilityReader_.hasUserGesture = true;
 
-hterm.openUrl = (url) => native.openLink(url);
+// A Cmd-click can reach both hterm's own link handling and openLinkAt, so drop
+// a repeat of the same URL.
+let lastOpened, lastOpenedTime = 0;
+hterm.openUrl = (url) => {
+    const now = Date.now();
+    if (url === lastOpened && now - lastOpenedTime < 1000)
+        return;
+    lastOpened = url;
+    lastOpenedTime = now;
+    native.openLink(url);
+};
+
+// Opens the link at a point in the web view, for Cmd-click. Links written with
+// OSC 8 carry their URL; otherwise the URL is found in the text, following it
+// across rows the terminal wrapped.
+const urlPattern = /(?:[a-zA-Z][a-zA-Z0-9+.-]*:\/\/|mailto:|www\.)[^\s<>"'`]+/g;
+exports.openLinkAt = (x, y) => {
+    const frame = term.scrollPort_.iframe_.getBoundingClientRect();
+    const doc = term.document_;
+    x -= frame.left;
+    y -= frame.top;
+    const node = doc.elementFromPoint(x, y);
+    const uriNode = node && node.closest('.uri-node');
+    if (uriNode) {
+        hterm.openUrl(uriNode.title);
+        return;
+    }
+    const row = node && node.closest('x-row');
+    const caret = doc.caretRangeFromPoint(x, y);
+    if (!row || !caret || !row.contains(caret.startContainer))
+        return;
+
+    // Offset of the click within the row's text.
+    let offset = 0;
+    const walker = doc.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+    for (let text; (text = walker.nextNode()) && text !== caret.startContainer;)
+        offset += text.length;
+    offset += caret.startOffset;
+
+    // Join the row with the rows it wraps from and into.
+    let first = row, last = row;
+    while (first.previousElementSibling && first.previousElementSibling.hasAttribute('line-overflow'))
+        first = first.previousElementSibling;
+    while (last.hasAttribute('line-overflow') && last.nextElementSibling)
+        last = last.nextElementSibling;
+    let line = '';
+    for (let r = first; ; r = r.nextElementSibling) {
+        if (r === row)
+            offset += line.length;
+        line += r.textContent;
+        if (r === last)
+            break;
+    }
+
+    for (const match of line.matchAll(urlPattern)) {
+        const url = match[0].replace(/[.,;:!?)\]}]+$/, '');
+        if (offset >= match.index && offset <= match.index + url.length) {
+            hterm.openUrl(url.startsWith('www.') ? 'http://' + url : url);
+            return;
+        }
+    }
+};
 
 native.load();
 native.syncFocus();
