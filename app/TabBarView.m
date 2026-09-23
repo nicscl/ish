@@ -146,6 +146,7 @@ static UIFont *TabFont(void) {
 @property UIStackView *stack;
 @property UIButton *addTabButton;
 @property UIButton *commandsButton;
+@property UIView *commandsBadge;
 @property UIView *bottomRule;
 @property NSLayoutConstraint *heightConstraint;
 @property NSLayoutConstraint *fillWidthConstraint;
@@ -203,6 +204,14 @@ static UIFont *TabFont(void) {
         ]];
         [self addSubview:_commandsButton];
 
+        _commandsBadge = [UIView new];
+        _commandsBadge.backgroundColor = UIColor.systemRedColor;
+        _commandsBadge.layer.cornerRadius = 4;
+        _commandsBadge.userInteractionEnabled = NO;
+        _commandsBadge.hidden = YES;
+        _commandsBadge.translatesAutoresizingMaskIntoConstraints = NO;
+        [_commandsButton addSubview:_commandsBadge];
+
         _scrollView = [TabScrollView new];
         _scrollView.showsHorizontalScrollIndicator = NO;
         _scrollView.showsVerticalScrollIndicator = NO;
@@ -245,6 +254,10 @@ static UIFont *TabFont(void) {
             [_commandsButton.topAnchor constraintEqualToAnchor:_scrollView.topAnchor],
             [_commandsButton.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
             [_commandsButton.widthAnchor constraintEqualToConstant:kSlotWidth],
+            [_commandsBadge.widthAnchor constraintEqualToConstant:8],
+            [_commandsBadge.heightAnchor constraintEqualToConstant:8],
+            [_commandsBadge.centerXAnchor constraintEqualToAnchor:_commandsButton.centerXAnchor constant:8],
+            [_commandsBadge.centerYAnchor constraintEqualToAnchor:_commandsButton.centerYAnchor constant:-6],
 
             [_stack.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
             [_stack.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
@@ -339,6 +352,12 @@ static UIFont *TabFont(void) {
     self.background = background;
     self.foreground = foreground;
     [self applyColors];
+}
+
+- (void)setShowsCommandsBadge:(BOOL)showsCommandsBadge {
+    _showsCommandsBadge = showsCommandsBadge;
+    self.commandsBadge.hidden = !showsCommandsBadge;
+    self.commandsButton.accessibilityValue = showsCommandsBadge ? @"Update available" : nil;
 }
 
 - (void)applyColors {

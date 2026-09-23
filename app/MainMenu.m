@@ -8,6 +8,7 @@
 #import "UserPreferences.h"
 #import "UIApplication+OpenURL.h"
 #import "iOSFS.h"
+#import "CurrentRoot.h"
 
 static NSString *const kSavedCommands = @"Saved Commands";
 
@@ -273,14 +274,19 @@ static UICommand *SettingsCommand(void) {
 }
 
 + (UIMenu *)commandsMenu {
+    UICommand *settings = SettingsCommand();
+    if (FsNeedsRepositoryUpdate())
+        settings.subtitle = @"Repository update available";
     return [UIMenu menuWithTitle:@"" image:nil identifier:ID(@"commands") options:0 children:@[
         Group(@"commands.quick", @[
             Key(@"New Tab", @"plus", @selector(newTab:), @"t", kCmd, nil),
-            SettingsCommand(),
+            Cmd(@"Paste", @"doc.on.clipboard", @selector(paste:), nil),
+            // Only shown while the keyboard is up, since the terminal handles it then.
+            Cmd(@"Hide Keyboard", @"keyboard.chevron.compact.down", @selector(loseFocus:), nil),
+            settings,
         ]),
         ShellMenu(),
-        Submenu(@"Edit", @"doc.on.clipboard", @"edit", @[
-            Cmd(@"Paste", @"doc.on.clipboard", @selector(paste:), nil),
+        Submenu(@"Edit", @"eraser", @"edit", @[
             EditExtras(),
         ]),
         ViewMenu(),

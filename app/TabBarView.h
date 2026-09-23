@@ -34,6 +34,9 @@ NS_ASSUME_NONNULL_BEGIN
 // Colors follow the terminal theme: background is the terminal background.
 - (void)setBackgroundColor:(UIColor *)background foregroundColor:(UIColor *)foreground;
 
+// A red dot on the ⋯ button, for something in its menu that wants attention.
+@property (nonatomic) BOOL showsCommandsBadge;
+
 @end
 
 NS_ASSUME_NONNULL_END

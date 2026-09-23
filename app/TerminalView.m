@@ -49,7 +49,13 @@ struct rowcol {
     ScrollbarView *scrollbarView = self.scrollbarView = [[ScrollbarView alloc] initWithFrame:self.bounds];
     scrollbarView.delegate = self;
     scrollbarView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    scrollbarView.bounces = NO;
+    // Dragging the terminal down into the keyboard pulls the keyboard down with
+    // the finger, as in Messages. That needs the drag to start even with nothing
+    // to scroll (no scrollback, or a full-screen program like tmux), which takes
+    // bouncing. The bounce doesn't show: the web view stays pinned in place and
+    // hterm clamps the out-of-range scroll positions it is sent.
+    scrollbarView.alwaysBounceVertical = YES;
+    scrollbarView.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
     [self addSubview:scrollbarView];
 
     // Cmd-click opens links. The web view doesn't reliably pass Cmd through to

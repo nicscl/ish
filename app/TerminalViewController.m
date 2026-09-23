@@ -48,11 +48,8 @@
 @property (weak, nonatomic) IBOutlet NSLayoutConstraint *barTrailing;
 @property (weak, nonatomic) IBOutlet NSLayoutConstraint *barButtonWidth;
 @property (weak, nonatomic) IBOutlet NSLayoutConstraint *barHeight;
-@property (weak, nonatomic) IBOutlet UIView *settingsBadge;
 
-@property (weak, nonatomic) IBOutlet UIButton *infoButton;
 @property (weak, nonatomic) IBOutlet UIButton *pasteButton;
-@property (weak, nonatomic) IBOutlet UIButton *hideKeyboardButton;
 
 // Sessions shown in this window, in tab order. All of them are also in the TerminalSessionStore.
 @property NSMutableArray<TerminalSession *> *tabs;
@@ -115,10 +112,9 @@
 
     [self _updateStyleFromPreferences:NO];
     
-    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-        [self.bar removeArrangedSubview:self.hideKeyboardButton];
-        [self.hideKeyboardButton removeFromSuperview];
-    }
+    self.barView.accessibilityCustomActions = @[[[UIAccessibilityCustomAction alloc] initWithName:@"Hide Keyboard" actionHandler:^BOOL(UIAccessibilityCustomAction *action) {
+        return [self.termView resignFirstResponder];
+    }]];
     if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone) {
         self.barHeight.constant = 36;
     } else {
@@ -127,9 +123,7 @@
     
     // SF Symbols is cool
     if (@available(iOS 13, *)) {
-        [self.infoButton setImage:[UIImage systemImageNamed:@"gear"] forState:UIControlStateNormal];
         [self.pasteButton setImage:[UIImage systemImageNamed:@"doc.on.clipboard"] forState:UIControlStateNormal];
-        [self.hideKeyboardButton setImage:[UIImage systemImageNamed:@"keyboard.chevron.compact.down"] forState:UIControlStateNormal];
         
         [self.tabKey setTitle:nil forState:UIControlStateNormal];
         [self.tabKey setImage:[UIImage systemImageNamed:@"arrow.right.to.line.alt"] forState:UIControlStateNormal];
@@ -406,7 +400,7 @@
 }
 
 - (void)_updateBadge {
-    self.settingsBadge.hidden = !FsNeedsRepositoryUpdate();
+    self.tabBar.showsCommandsBadge = FsNeedsRepositoryUpdate();
 }
 
 - (UIStatusBarStyle)preferredStatusBarStyle {
