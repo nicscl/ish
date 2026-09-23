@@ -193,12 +193,35 @@ void vec_compares_gtd128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst);
 
 void vec_movl_p64(NO_CPU, const uint64_t *src, union xmm_reg *dst);
 void vec_movl_pm64(NO_CPU, const union xmm_reg *src, uint64_t *dst);
+void vec_movhl_p128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst);
+void vec_movlh_p128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst);
 void vec_movh_p64(NO_CPU, const uint64_t *src, union xmm_reg *dst);
 void vec_movh_pm64(NO_CPU, const union xmm_reg *src, uint64_t *dst);
 
 void vec_movmask_b64(NO_CPU, const union mm_reg *src, uint32_t *dst);
 void vec_movmask_b128(NO_CPU, const union xmm_reg *src, uint32_t *dst);
 void vec_fmovmask_d128(NO_CPU, const union xmm_reg *src, uint32_t *dst);
+void vec_fmovmask_s128(NO_CPU, const union xmm_reg *src, uint32_t *dst);
+void vec_div_p64(NO_CPU, union xmm_reg *src, union xmm_reg *dst);
+void vec_div_p32(NO_CPU, union xmm_reg *src, union xmm_reg *dst);
+void vec_fmin_p64(NO_CPU, union xmm_reg *src, union xmm_reg *dst);
+void vec_fmin_p32(NO_CPU, union xmm_reg *src, union xmm_reg *dst);
+void vec_fmax_p64(NO_CPU, union xmm_reg *src, union xmm_reg *dst);
+void vec_fmax_p32(NO_CPU, union xmm_reg *src, union xmm_reg *dst);
+void vec_fsqrt_p64(NO_CPU, union xmm_reg *src, union xmm_reg *dst);
+void vec_fsqrt_p32(NO_CPU, union xmm_reg *src, union xmm_reg *dst);
+void vec_frsqrt_p32(NO_CPU, union xmm_reg *src, union xmm_reg *dst);
+void vec_frcp_p32(NO_CPU, union xmm_reg *src, union xmm_reg *dst);
+void vec_fcmp_p32(NO_CPU, const union xmm_reg *src, union xmm_reg *dst, uint8_t type);
+void vec_cvtsd2si64(NO_CPU, const double *src, int32_t *dst);
+void vec_cvtss2si32(NO_CPU, const float *src, int32_t *dst);
+void vec_cvtps2dq32(NO_CPU, const union xmm_reg *src, union xmm_reg *dst);
+void vec_cvtpd2dq64(NO_CPU, const union xmm_reg *src, union xmm_reg *dst);
+void vec_cvtdq2ps32(NO_CPU, const union xmm_reg *src, union xmm_reg *dst);
+void vec_cvtdq2pd64(NO_CPU, const uint64_t *src, union xmm_reg *dst);
+void vec_cvtps2pd64(NO_CPU, const uint64_t *src, union xmm_reg *dst);
+void vec_cvtpd2ps64(NO_CPU, const union xmm_reg *src, union xmm_reg *dst);
+void vec_stmxcsr32(NO_CPU, const union xmm_reg *src, uint32_t *dst);
 
 void vec_insert_w64(NO_CPU, const uint32_t *src, union mm_reg *dst, uint8_t index);
 void vec_insert_w128(NO_CPU, const uint32_t *src, union xmm_reg *dst, uint8_t index);

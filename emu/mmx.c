@@ -49,7 +49,7 @@ union vec {
 
 #define VEC_MMX_SHIFT(dir, suffix, op, size) \
     void vec_shift##dir##_##suffix##64(NO_CPU, const union mm_reg *src, union mm_reg *dst) { \
-        const uint8_t amount = src->qw; \
+        const uint8_t amount = src->qw > 255 ? 255 : src->qw; \
         _SHIFT(op, size); \
     } \
     void vec_imm_shift##dir##_##suffix##64(NO_CPU, const uint8_t amount, union mm_reg *dst) { \
@@ -93,7 +93,7 @@ VEC_MMX_SHIFT(l, q, <<, 64)
 
 void vec_shiftrs_w64(NO_CPU, const union mm_reg *src, union mm_reg *dst) {
     union vec d = { .qw = dst->qw };
-    const uint8_t amount = src->qw;
+    const uint8_t amount = src->qw > 255 ? 255 : src->qw;
     for (unsigned i = 0; i < 4; i++) {
         if (amount > 15)
             d.u16[i] = ((d.u16[i] >> 15) & (uint16_t)1) ? 0xffff : 0;
@@ -104,7 +104,7 @@ void vec_shiftrs_w64(NO_CPU, const union mm_reg *src, union mm_reg *dst) {
 }
 void vec_shiftrs_d64(NO_CPU, const union mm_reg *src, union mm_reg *dst) {
     union vec d = { .qw = dst->qw };
-    const uint8_t amount = src->qw;
+    const uint8_t amount = src->qw > 255 ? 255 : src->qw;
     for (unsigned i = 0; i < 2; i++) {
         if (amount > 31)
             d.u32[i] = ((d.u32[i] >> 31) & (uint32_t)1) ? 0xffffffff : 0;

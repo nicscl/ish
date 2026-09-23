@@ -89,7 +89,7 @@ void vec_merge128(NO_CPU, const void *src, void *dst) {
 
 #define VEC_SSE_SHIFT(dir, suffix, op, size) \
     void vec_shift##dir##_##suffix##128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst) { \
-        const uint8_t amount = src->u8[0]; \
+        const uint8_t amount = src->qw[0] > 255 ? 255 : src->qw[0]; \
         _SHIFT(op, size); \
     } \
     void vec_imm_shift##dir##_##suffix##128(NO_CPU, const uint8_t amount, union xmm_reg *dst) { \
@@ -160,7 +160,7 @@ void vec_imm_shiftr_dq128(NO_CPU, uint8_t amount, union xmm_reg *dst) {
         dst->u128 >>= amount * 8;
 }
 void vec_shiftrs_w128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst) {
-    const uint8_t amount = src->u8[0];
+    const uint8_t amount = src->qw[0] > 255 ? 255 : src->qw[0];
     for (unsigned i = 0; i < 8; i++) {
         if (unlikely(amount > 15))
             dst->u16[i] = ((dst->u16[i] >> 15) & (uint16_t)1) ? 0xffff : 0;
@@ -169,7 +169,7 @@ void vec_shiftrs_w128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst) {
     }
 }
 void vec_shiftrs_d128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst) {
-    const uint8_t amount = src->u8[0];
+    const uint8_t amount = src->qw[0] > 255 ? 255 : src->qw[0];
     for (unsigned i = 0; i < 4; i++) {
         if (unlikely(amount > 31))
             dst->u32[i] = ((dst->u32[i] >> 31) & (uint32_t)1) ? 0xffffffff : 0;
@@ -331,8 +331,22 @@ void vec_single_fsub32(NO_CPU, const float *src, float *dst) { *dst -= *src; }
 void vec_single_fdiv64(NO_CPU, const double *src, double *dst) { *dst /= *src; }
 void vec_single_fdiv32(NO_CPU, const float *src, float *dst) { *dst /= *src; }
 
-void vec_single_fsqrt64(NO_CPU, const double *src, double *dst) { *dst = sqrt(*src); }
-void vec_single_fsqrt32(NO_CPU, const float *src, float *dst) { *dst = sqrtf(*src); }
+// x86's default nan has the sign bit set, arm's doesn't. The fixup works on
+// the bits because the compiler considers all nans interchangeable.
+static void x86_sqrt(const double *src, double *dst) {
+    double x = *src, r = sqrt(x);
+    memcpy(dst, &r, sizeof(r));
+    if (x < 0)
+        *(uint64_t *) dst |= (uint64_t) 1 << 63;
+}
+static void x86_sqrtf(const float *src, float *dst) {
+    float x = *src, r = sqrtf(x);
+    memcpy(dst, &r, sizeof(r));
+    if (x < 0)
+        *(uint32_t *) dst |= (uint32_t) 1 << 31;
+}
+void vec_single_fsqrt64(NO_CPU, const double *src, double *dst) { x86_sqrt(src, dst); }
+void vec_single_fsqrt32(NO_CPU, const float *src, float *dst) { x86_sqrtf(src, dst); }
 
 void vec_single_fmax64(NO_CPU, const double *src, double *dst) {
     if (*src > *dst || isnan(*src) || isnan(*dst)) *dst = *src;
@@ -382,6 +396,39 @@ VEC_PACKED_OP(sub_p, -, f64, 64, 2)
 VEC_PACKED_OP(sub_p, -, f32, 32, 4)
 VEC_PACKED_OP(mul_p, *, f64, 64, 2)
 VEC_PACKED_OP(mul_p, *, f32, 32, 4)
+VEC_PACKED_OP(div_p, /, f64, 64, 2)
+VEC_PACKED_OP(div_p, /, f32, 32, 4)
+
+#define VEC_PACKED_FN(name, body, field, size, n) \
+    void vec_##name##size(NO_CPU, union xmm_reg *src, union xmm_reg *dst) { \
+        for (int i = 0; i < n; ++i) { \
+            __typeof__(src->field[0]) s = src->field[i], d = dst->field[i]; \
+            dst->field[i] = (body); \
+        } \
+    }
+
+// x86 returns the source unless the comparison holds, so for nans and equal
+// values (including zeros of either sign)
+VEC_PACKED_FN(fmin_p, d < s ? d : s, f64, 64, 2)
+VEC_PACKED_FN(fmin_p, d < s ? d : s, f32, 32, 4)
+VEC_PACKED_FN(fmax_p, d > s ? d : s, f64, 64, 2)
+VEC_PACKED_FN(fmax_p, d > s ? d : s, f32, 32, 4)
+void vec_fsqrt_p64(NO_CPU, union xmm_reg *src, union xmm_reg *dst) {
+    for (int i = 0; i < 2; i++)
+        x86_sqrt(&src->f64[i], &dst->f64[i]);
+}
+void vec_fsqrt_p32(NO_CPU, union xmm_reg *src, union xmm_reg *dst) {
+    for (int i = 0; i < 4; i++)
+        x86_sqrtf(&src->f32[i], &dst->f32[i]);
+}
+// real hardware only approximates these
+VEC_PACKED_FN(frsqrt_p, 1 / sqrtf(s), f32, 32, 4)
+VEC_PACKED_FN(frcp_p, 1 / s, f32, 32, 4)
+
+void vec_fcmp_p32(NO_CPU, const union xmm_reg *src, union xmm_reg *dst, uint8_t type) {
+    for (size_t i = 0; i < 4; ++i)
+        dst->u32[i] = cmps(dst->f32[i], src->f32[i], type) ? -1 : 0;
+}
 
 void vec_fcmp_p64(NO_CPU, const union xmm_reg *src, union xmm_reg *dst, uint8_t type) {
     for (size_t i = 0; i < sizeof(dst->f64) / sizeof(*dst->f64); ++i) {
@@ -425,6 +472,55 @@ VEC_CVT(ss2sd32, float, double)
 
 PACKED_VEC_CVT(tpd2dq64, f64, u32, double, int32_t, 2)
 PACKED_VEC_CVT(tps2dq32, f32, u32, float, int32_t, 4)
+
+// Out of range and nan give the "integer indefinite" value, like x86.
+static int32_t cvt_round(double x) {
+    x = nearbyint(x);
+    if (isnan(x) || x < INT32_MIN || x > INT32_MAX)
+        return INT32_MIN;
+    return (int32_t) x;
+}
+void vec_cvtsd2si64(NO_CPU, const double *src, int32_t *dst) { *dst = cvt_round(*src); }
+void vec_cvtss2si32(NO_CPU, const float *src, int32_t *dst) { *dst = cvt_round(*src); }
+void vec_cvtps2dq32(NO_CPU, const union xmm_reg *src, union xmm_reg *dst) {
+    union xmm_reg s = *src;
+    for (int i = 0; i < 4; i++)
+        dst->u32[i] = cvt_round(s.f32[i]);
+}
+void vec_cvtpd2dq64(NO_CPU, const union xmm_reg *src, union xmm_reg *dst) {
+    union xmm_reg s = *src;
+    dst->u32[0] = cvt_round(s.f64[0]);
+    dst->u32[1] = cvt_round(s.f64[1]);
+    dst->qw[1] = 0;
+}
+void vec_cvtdq2ps32(NO_CPU, const union xmm_reg *src, union xmm_reg *dst) {
+    union xmm_reg s = *src;
+    for (int i = 0; i < 4; i++)
+        dst->f32[i] = (int32_t) s.u32[i];
+}
+// these two read only 64 bits of source
+void vec_cvtdq2pd64(NO_CPU, const uint64_t *src, union xmm_reg *dst) {
+    uint64_t s = *src;
+    dst->f64[0] = (int32_t) (uint32_t) s;
+    dst->f64[1] = (int32_t) (uint32_t) (s >> 32);
+}
+void vec_cvtps2pd64(NO_CPU, const uint64_t *src, union xmm_reg *dst) {
+    uint64_t s = *src;
+    float f[2];
+    memcpy(f, &s, sizeof(f));
+    dst->f64[0] = f[0];
+    dst->f64[1] = f[1];
+}
+void vec_cvtpd2ps64(NO_CPU, const union xmm_reg *src, union xmm_reg *dst) {
+    union xmm_reg s = *src;
+    dst->f32[0] = s.f64[0];
+    dst->f32[1] = s.f64[1];
+    dst->qw[1] = 0;
+}
+void vec_stmxcsr32(NO_CPU, const union xmm_reg *UNUSED(src), uint32_t *dst) {
+    // the default: all exceptions masked, round to nearest
+    *dst = 0x1f80;
+}
 
 void vec_unpackl_bw128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst) {
     for (int i = 7; i >= 0; i--) {
@@ -533,20 +629,29 @@ void vec_shuffle_d128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst, uint
         dst->u32[i] = src_copy.u32[(encoding >> (i*2)) % 4];
 }
 void vec_shuffle_ps128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst, uint8_t encoding) {
-    dst->u32[0] = dst->u32[(encoding >> 0) & 3];
-    dst->u32[1] = dst->u32[(encoding >> 2) & 3];
-    dst->u32[2] = src->u32[(encoding >> 4) & 3];
-    dst->u32[3] = src->u32[(encoding >> 6) & 3];
+    union xmm_reg s = *src, d = *dst;
+    dst->u32[0] = d.u32[(encoding >> 0) & 3];
+    dst->u32[1] = d.u32[(encoding >> 2) & 3];
+    dst->u32[2] = s.u32[(encoding >> 4) & 3];
+    dst->u32[3] = s.u32[(encoding >> 6) & 3];
 }
 void vec_shuffle_pd128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst, uint8_t encoding) {
-    dst->qw[0] = dst->qw[(encoding >> 0) & 1];
-    dst->qw[1] = src->qw[(encoding >> 1) & 1];
+    union xmm_reg s = *src, d = *dst;
+    dst->qw[0] = d.qw[(encoding >> 0) & 1];
+    dst->qw[1] = s.qw[(encoding >> 1) & 1];
 }
 
 void vec_movmask_b128(NO_CPU, const union xmm_reg *src, uint32_t *dst) {
     *dst = 0;
     for (unsigned i = 0; i < array_size(src->u8); i++) {
         if (src->u8[i] & (1 << 7))
+            *dst |= 1 << i;
+    }
+}
+void vec_fmovmask_s128(NO_CPU, const union xmm_reg *src, uint32_t *dst) {
+    *dst = 0;
+    for (unsigned i = 0; i < array_size(src->u32); i++) {
+        if (src->u32[i] >> 31)
             *dst |= 1 << i;
     }
 }
@@ -563,6 +668,12 @@ void vec_movl_p64(NO_CPU, const uint64_t *src, union xmm_reg *dst) {
 }
 void vec_movl_pm64(NO_CPU, const union xmm_reg *src, uint64_t *dst) {
     *dst = src->qw[0];
+}
+void vec_movhl_p128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst) {
+    dst->qw[0] = src->qw[1];
+}
+void vec_movlh_p128(NO_CPU, const union xmm_reg *src, union xmm_reg *dst) {
+    dst->qw[1] = src->qw[0];
 }
 void vec_movh_p64(NO_CPU, const uint64_t *src, union xmm_reg *dst) {
     dst->qw[1] = *src;
