@@ -202,6 +202,32 @@ dword_t sys_nanosleep(addr_t req_addr, addr_t rem_addr) {
     return 0;
 }
 
+dword_t sys_clock_nanosleep(dword_t clock, dword_t flags, addr_t req_addr, addr_t rem_addr) {
+    STRACE("clock_nanosleep(%d, %d, 0x%x, 0x%x)", clock, flags, req_addr, rem_addr);
+    if (!(flags & TIMER_ABSTIME_))
+        return sys_nanosleep(req_addr, rem_addr);
+    struct timespec_ req_ts;
+    if (user_get(req_addr, req_ts))
+        return _EFAULT;
+    clockid_t clock_id;
+    if (clockid_to_real(clock, &clock_id))
+        return _EINVAL;
+    struct timespec now;
+    if (clock_gettime(clock_id, &now) < 0)
+        return errno_map();
+    struct timespec req = {.tv_sec = req_ts.sec - now.tv_sec, .tv_nsec = req_ts.nsec - now.tv_nsec};
+    if (req.tv_nsec < 0) {
+        req.tv_nsec += 1000000000;
+        req.tv_sec--;
+    }
+    if (req.tv_sec < 0)
+        return 0;
+    // the remaining time is never reported for an absolute sleep
+    if (nanosleep(&req, NULL) < 0)
+        return errno_map();
+    return 0;
+}
+
 dword_t sys_times(addr_t tbuf) {
     STRACE("times(0x%x)", tbuf);
     if (tbuf) {

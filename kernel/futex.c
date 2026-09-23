@@ -3,8 +3,11 @@
 #define FUTEX_WAIT_ 0
 #define FUTEX_WAKE_ 1
 #define FUTEX_REQUEUE_ 3
+#define FUTEX_WAIT_BITSET_ 9
+#define FUTEX_WAKE_BITSET_ 10
 #define FUTEX_PRIVATE_FLAG_ 128
-#define FUTEX_CMD_MASK_ ~(FUTEX_PRIVATE_FLAG_)
+#define FUTEX_CLOCK_REALTIME_ 256
+#define FUTEX_CMD_MASK_ ~(FUTEX_PRIVATE_FLAG_ | FUTEX_CLOCK_REALTIME_)
 
 struct futex {
     atomic_uint refcount;
@@ -157,23 +160,43 @@ dword_t sys_futex(addr_t uaddr, dword_t op, dword_t val, addr_t timeout_or_val2,
         STRACE("!FUTEX_PRIVATE ");
     }
     struct timespec timeout = {0};
-    if ((op & FUTEX_CMD_MASK_) == FUTEX_WAIT_ && timeout_or_val2) {
+    int cmd = op & FUTEX_CMD_MASK_;
+    if ((cmd == FUTEX_WAIT_ || cmd == FUTEX_WAIT_BITSET_) && timeout_or_val2) {
         struct timespec_ timeout_;
         if (user_get(timeout_or_val2, timeout_))
             return _EFAULT;
         timeout.tv_sec = timeout_.sec;
         timeout.tv_nsec = timeout_.nsec;
     }
-    switch (op & FUTEX_CMD_MASK_) {
+    // Bitset ops are treated as matching every waiter, which only adds
+    // spurious wakeups. Their timeout is absolute, so make it relative.
+    if (cmd == FUTEX_WAIT_BITSET_ || cmd == FUTEX_WAKE_BITSET_) {
+        if (val3 == 0)
+            return _EINVAL;
+        if (cmd == FUTEX_WAIT_BITSET_ && timeout_or_val2) {
+            struct timespec now;
+            clock_gettime(op & FUTEX_CLOCK_REALTIME_ ? CLOCK_REALTIME : CLOCK_MONOTONIC, &now);
+            timeout.tv_sec -= now.tv_sec;
+            timeout.tv_nsec -= now.tv_nsec;
+            if (timeout.tv_nsec < 0) {
+                timeout.tv_nsec += 1000000000;
+                timeout.tv_sec--;
+            }
+            if (timeout.tv_sec < 0)
+                timeout.tv_sec = timeout.tv_nsec = 0;
+        }
+        cmd = cmd == FUTEX_WAIT_BITSET_ ? FUTEX_WAIT_ : FUTEX_WAKE_;
+    }
+    switch (cmd) {
         case FUTEX_WAIT_:
             STRACE("futex(FUTEX_WAIT, %#x, %d, 0x%x {%ds %dns}) = ...\n", uaddr, val, timeout_or_val2, timeout.tv_sec, timeout.tv_nsec);
             return futex_wait(uaddr, val, timeout_or_val2 ? &timeout : NULL);
         case FUTEX_WAKE_:
             STRACE("futex(FUTEX_WAKE, %#x, %d)", uaddr, val);
-            return futex_wakelike(op & FUTEX_CMD_MASK_, uaddr, val, 0, 0);
+            return futex_wakelike(cmd, uaddr, val, 0, 0);
         case FUTEX_REQUEUE_:
             STRACE("futex(FUTEX_REQUEUE, %#x, %d, %#x)", uaddr, val, uaddr2);
-            return futex_wakelike(op & FUTEX_CMD_MASK_, uaddr, val, timeout_or_val2, uaddr2);
+            return futex_wakelike(cmd, uaddr, val, timeout_or_val2, uaddr2);
     }
     STRACE("futex(%#x, %d, %d, timeout=%#x, %#x, %d) ", uaddr, op, val, timeout_or_val2, uaddr2, val3);
     FIXME("unsupported futex operation %d", op);
