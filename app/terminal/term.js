@@ -34,6 +34,12 @@ x-row {
 .uri-node {
   text-decoration: underline;
 }
+.cell-node {
+  display: inline-block;
+  text-align: center;
+  width: var(--hterm-charsize-width);
+  line-height: var(--hterm-charsize-height);
+}
 `;
 
 function onTerminalReady() {
@@ -160,10 +166,94 @@ exports.updateStyle = ({foregroundColor, backgroundColor, fontFamily, fontSize, 
     term.getPrefs().set('color-palette-overrides', colorPaletteOverrides);
     term.getPrefs().set('cursor-blink', blinkCursor);
     term.getPrefs().set('cursor-shape', cursorShape);
+    cellFits.clear();
 };
 
 exports.getCharacterSize = () => {
     return [term.scrollPort_.characterSize.width, term.scrollPort_.characterSize.height];
+};
+
+// A character the terminal font lacks is drawn from a fallback font (or as an
+// emoji) whose width isn't the cell width, so the rest of its row drifts: tmux
+// pane borders break and block-character logos come apart. hterm only pins
+// double-width characters to their cells, so pin these too, each in its own
+// .cell-node span.
+const cellCanvas = document.createElement('canvas').getContext('2d');
+let cellFits = new Map(), cellWidth;
+function fitsCell(grapheme) {
+    let fits = cellFits.get(grapheme);
+    if (fits === undefined) {
+        if (cellFits.size == 0) {
+            cellCanvas.font = `${term.getPrefs().get('font-size')}px ${term.getPrefs().get('font-family')}`;
+            cellWidth = cellCanvas.measureText('M').width;
+        }
+        fits = Math.abs(cellCanvas.measureText(grapheme).width - cellWidth) < 0.01;
+        cellFits.set(grapheme, fits);
+    }
+    return fits;
+}
+function needsCell(str) {
+    return lib.wc.strWidth(str) == 1 && !/^[\x20-\x7f]*$/.test(str) && !fitsCell(str);
+}
+
+// Split runs of narrow non-ASCII characters so each one that needs a cell gets
+// its own token.
+const segmenter = new Intl.Segmenter(undefined, {type: 'grapheme'});
+const realSplit = hterm.TextAttributes.splitWidecharString;
+hterm.TextAttributes.splitWidecharString = (str) => {
+    const tokens = [];
+    for (const token of realSplit(str)) {
+        if (token.asciiNode || token.wcNode) {
+            tokens.push(token);
+            continue;
+        }
+        let run = null;
+        for (const {segment} of segmenter.segment(token.str)) {
+            const width = lib.wc.strWidth(segment);
+            if (needsCell(segment)) {
+                tokens.push({str: segment, wcNode: false, asciiNode: false, wcStrWidth: width});
+                run = null;
+            } else if (run) {
+                run.str += segment;
+                run.wcStrWidth += width;
+            } else {
+                tokens.push(run = {str: segment, wcNode: false, asciiNode: false, wcStrWidth: width});
+            }
+        }
+    }
+    return tokens;
+};
+// Tokens only carry wcNode and asciiNode into the text attributes, so tell a
+// cell token apart by its text while it is written.
+for (const name of ['insertString', 'overwriteString']) {
+    const real = hterm.Screen.prototype[name];
+    hterm.Screen.prototype[name] = function(str, wcwidth) {
+        const attrs = this.textAttributes;
+        const outer = attrs.cellNode;
+        attrs.cellNode = !attrs.asciiNode && !attrs.wcNode && needsCell(str);
+        try {
+            return real.call(this, str, wcwidth);
+        } finally {
+            attrs.cellNode = outer;
+        }
+    };
+}
+// A cell node holds exactly one character.
+const realMatches = hterm.TextAttributes.prototype.matchesContainer;
+hterm.TextAttributes.prototype.matchesContainer = function(obj) {
+    if (this.cellNode || obj.cellNode)
+        return false;
+    return realMatches.call(this, obj);
+};
+const realCreate = hterm.TextAttributes.prototype.createContainer;
+hterm.TextAttributes.prototype.createContainer = function(textContent = '') {
+    const node = realCreate.call(this, textContent);
+    // Only the character itself: the same call also makes filler spaces.
+    if (this.cellNode && node.nodeType == Node.ELEMENT_NODE && needsCell(textContent)) {
+        node.classList.add('cell-node');
+        node.cellNode = true;
+    }
+    return node;
 };
 
 exports.clearScrollback = () => term.clearScrollback();
