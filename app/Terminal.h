@@ -33,6 +33,8 @@ struct tty;
 - (void)sendInput:(NSData *)input;
 
 - (NSString *)arrow:(char)direction;
+// With modifiers, xterm's CSI 1;m form (2=Shift, 3=Alt, 5=Ctrl, ...).
+- (NSString *)arrow:(char)direction modifiers:(UIKeyModifierFlags)modifiers;
 
 // Make this terminal no longer be the singleton terminal with its type and number. Will happen eventually if all references go away, but sometimes you want it to happen now.
 // Hangs up the tty: reads fail, the foreground job gets SIGHUP, and the

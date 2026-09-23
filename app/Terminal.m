@@ -262,6 +262,16 @@ static NSString *const TERMINAL_HANDLERS[] = {@"load", @"log", @"sendInput", @"r
     return [NSString stringWithFormat:@"\x1b%c%c", self.applicationCursor ? 'O' : '[', direction];
 }
 
+- (NSString *)arrow:(char)direction modifiers:(UIKeyModifierFlags)modifiers {
+    int m = 1;
+    if (modifiers & UIKeyModifierShift)     m += 1;
+    if (modifiers & UIKeyModifierAlternate) m += 2;
+    if (modifiers & UIKeyModifierControl)   m += 4;
+    if (m == 1)
+        return [self arrow:direction];
+    return [NSString stringWithFormat:@"\x1b[1;%d%c", m, direction];
+}
+
 - (void)refresh {
     if (!self.loaded)
         return;

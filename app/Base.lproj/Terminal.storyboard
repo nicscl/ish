@@ -62,6 +62,8 @@
                         <outletCollection property="barButtons" destination="W9v-cj-FWz" id="OFf-FH-2Xy"/>
                         <outletCollection property="barButtons" destination="IPm-l0-f25" id="dHH-gh-Tzq"/>
                         <outletCollection property="barButtons" destination="VCr-TW-PIZ" id="NlS-hh-ara"/>
+                        <outletCollection property="barButtons" destination="Shf-Ar-rw1" id="Shf-Ou-t01"/>
+                        <outletCollection property="barButtons" destination="Ctl-Ar-rw1" id="Ctl-Ou-t01"/>
                         <outletCollection property="barControls" destination="7qw-ie-p4d" id="fDV-Yg-Dec"/>
                         <outletCollection property="barControls" destination="hmm-tv-z35" id="EEv-5m-po5"/>
                         <outletCollection property="barControls" destination="5dl-UV-6qh" id="ocU-st-RdO"/>
@@ -135,6 +137,40 @@
                                         <action selector="pressArrow:" destination="BYZ-38-t0r" eventType="valueChanged" id="SBI-0w-nSu"/>
                                     </connections>
                                 </button>
+                                <button contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Shf-Ar-rw1" userLabel="Shift Arrows" customClass="ArrowBarButton">
+                                    <rect key="frame" x="111" y="0.0" width="31" height="50"/>
+                                    <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                    <fontDescription key="fontDescription" type="system" pointSize="24"/>
+                                    <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                    <state key="normal">
+                                        <color key="titleColor" systemColor="darkTextColor"/>
+                                    </state>
+                                    <userDefinedRuntimeAttributes>
+                                        <userDefinedRuntimeAttribute type="number" keyPath="modifiers">
+                                            <integer key="value" value="131072"/>
+                                        </userDefinedRuntimeAttribute>
+                                    </userDefinedRuntimeAttributes>
+                                    <connections>
+                                        <action selector="pressArrow:" destination="BYZ-38-t0r" eventType="valueChanged" id="Shf-Ac-t01"/>
+                                    </connections>
+                                </button>
+                                <button contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Ctl-Ar-rw1" userLabel="Control Arrows" customClass="ArrowBarButton">
+                                    <rect key="frame" x="111" y="0.0" width="31" height="50"/>
+                                    <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                    <fontDescription key="fontDescription" type="system" pointSize="24"/>
+                                    <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                    <state key="normal">
+                                        <color key="titleColor" systemColor="darkTextColor"/>
+                                    </state>
+                                    <userDefinedRuntimeAttributes>
+                                        <userDefinedRuntimeAttribute type="number" keyPath="modifiers">
+                                            <integer key="value" value="262144"/>
+                                        </userDefinedRuntimeAttribute>
+                                    </userDefinedRuntimeAttributes>
+                                    <connections>
+                                        <action selector="pressArrow:" destination="BYZ-38-t0r" eventType="valueChanged" id="Ctl-Ac-t01"/>
+                                    </connections>
+                                </button>
                                 <view contentMode="scaleToFill" horizontalHuggingPriority="100" translatesAutoresizingMaskIntoConstraints="NO" id="qmg-M1-7W8" userLabel="Spacer">
                                     <rect key="frame" x="148" y="0.0" width="229" height="50"/>
                                 </view>
@@ -206,6 +242,8 @@
                                 <constraint firstItem="W9v-cj-FWz" firstAttribute="width" secondItem="5dl-UV-6qh" secondAttribute="width" id="Xdt-z5-Zdb"/>
                                 <constraint firstItem="IPm-l0-f25" firstAttribute="width" secondItem="5dl-UV-6qh" secondAttribute="width" id="ebo-yF-ffX"/>
                                 <constraint firstItem="5dl-UV-6qh" firstAttribute="width" secondItem="VCr-TW-PIZ" secondAttribute="width" id="fXl-3w-1Zj"/>
+                                <constraint firstItem="5dl-UV-6qh" firstAttribute="width" secondItem="Shf-Ar-rw1" secondAttribute="width" id="Shf-Wd-t01"/>
+                                <constraint firstItem="5dl-UV-6qh" firstAttribute="width" secondItem="Ctl-Ar-rw1" secondAttribute="width" id="Ctl-Wd-t01"/>
                                 <constraint firstItem="cJt-oG-BnW" firstAttribute="width" secondItem="5dl-UV-6qh" secondAttribute="width" id="oQb-HX-lTG"/>
                             </constraints>
                         </stackView>

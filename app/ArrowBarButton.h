@@ -21,6 +21,9 @@ typedef enum : NSUInteger {
 
 @property (nonatomic, readonly) ArrowDirection direction;
 @property (nonatomic) UIKeyboardAppearance keyAppearance;
+// Held along with the arrow, shown in the corner: Shift or Control for the extra
+// buttons in the bar. Set from the storyboard.
+@property (nonatomic) UIKeyModifierFlags modifiers;
 
 @end
 

@@ -12,6 +12,8 @@
     CALayer *arrowLayers[5];
 }
 
+@property CATextLayer *modifierLayer;
+
 @property CGPoint startPoint;
 @property (nonatomic) ArrowDirection direction;
 @property BOOL accessibilityUpDown;
@@ -65,7 +67,12 @@ static CGPoint anchors[] = {
     return UIAccessibilityTraitAdjustable;
 }
 - (NSString *)accessibilityLabel {
-    return self.accessibilityUpDown ? @"Arrow Keys Up or Down" : @"Arrow Keys Left or Right";
+    NSString *label = self.accessibilityUpDown ? @"Arrow Keys Up or Down" : @"Arrow Keys Left or Right";
+    if (self.modifiers & UIKeyModifierControl)
+        label = [@"Control " stringByAppendingString:label];
+    if (self.modifiers & UIKeyModifierShift)
+        label = [@"Shift " stringByAppendingString:label];
+    return label;
 }
 - (NSString *)accessibilityHint {
     return @"Double tap to toggle direction";
@@ -108,11 +115,41 @@ static CGPoint anchors[] = {
     self->arrowLayers[direction] = layer;
 }
 
+- (void)setModifiers:(UIKeyModifierFlags)modifiers {
+    _modifiers = modifiers;
+    NSString *symbol = @"";
+    if (modifiers & UIKeyModifierControl)
+        symbol = [symbol stringByAppendingString:@"⌃"];
+    if (modifiers & UIKeyModifierShift)
+        symbol = [symbol stringByAppendingString:@"⇧"];
+    [self.modifierLayer removeFromSuperlayer];
+    self.modifierLayer = nil;
+    if (symbol.length == 0)
+        return;
+
+    CATextLayer *layer = [CATextLayer new];
+    layer.contentsScale = UIScreen.mainScreen.scale;
+    layer.string = symbol;
+    layer.fontSize = 10;
+    UIFont *font = [UIFont systemFontOfSize:layer.fontSize];
+    layer.font = (__bridge CFTypeRef _Nullable) font;
+    CGSize textSize = [[NSAttributedString alloc] initWithString:symbol attributes:@{NSFontAttributeName: font}].size;
+    layer.bounds = CGRectMake(0, 0, ceil(textSize.width), ceil(textSize.height));
+    layer.alignmentMode = kCAAlignmentLeft;
+    layer.anchorPoint = CGPointZero;
+    [self.layer addSublayer:layer];
+    self.modifierLayer = layer;
+    [self setColors];
+    [self.layer setNeedsLayout];
+}
+
 - (void)layoutSublayersOfLayer:(CALayer *)superlayer {
     NSParameterAssert(superlayer == self.layer);
     for (CALayer *layer in superlayer.sublayers) {
         layer.position = CGPointMake(self.bounds.size.width / 2, self.bounds.size.height / 2);
     }
+    // In the top left corner, clear of the arrows.
+    self.modifierLayer.position = CGPointMake(3, 2);
 }
 
 - (BOOL)beginTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
@@ -165,6 +202,7 @@ static CGPoint anchors[] = {
                 layer.opacity = 1;
             }
         }
+        self.modifierLayer.opacity = self.selected ? 0.25 : 1;
     }];
 }
 
@@ -222,6 +260,7 @@ static CGPoint anchors[] = {
         else
             layer.foregroundColor = UIColor.whiteColor.CGColor;
     }
+    self.modifierLayer.foregroundColor = self.textColor.CGColor;
     [self animateLayerUpdates];
 }
 
