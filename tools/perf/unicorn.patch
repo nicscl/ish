@@ -1,0 +1,49 @@
+diff --git a/include/unicorn/unicorn.h b/include/unicorn/unicorn.h
+index b4ffc6b..b16f848 100644
+--- a/include/unicorn/unicorn.h
++++ b/include/unicorn/unicorn.h
+@@ -1059,6 +1059,10 @@ uc_err uc_emu_start(uc_engine *uc, uint64_t begin, uint64_t until,
+ UNICORN_EXPORT
+ uc_err uc_emu_stop(uc_engine *uc);
+ 
++// Ask a running engine to stop from another thread (ish experiment).
++UNICORN_EXPORT
++void uc_request_stop(uc_engine *uc);
++
+ /*
+  Register callback for a hook event.
+  The callback will be run when the hook event is hit.
+diff --git a/qemu/tcg/tcg-op.c b/qemu/tcg/tcg-op.c
+index d0223ea..ab0111c 100644
+--- a/qemu/tcg/tcg-op.c
++++ b/qemu/tcg/tcg-op.c
+@@ -2855,7 +2855,10 @@ void check_exit_request(TCGContext *tcg_ctx)
+     // Unicorn:
+     //   For ARM IT block, we couldn't exit in the middle of the
+     //   block and this is the our hack here.
+-    if (tcg_ctx->uc->no_exit_request) {
++    static int skip = -1;
++    if (skip < 0)
++        skip = getenv("UC_NO_MEMOP_EXIT_CHECK") != NULL;
++    if (tcg_ctx->uc->no_exit_request || skip) {
+         return;
+     }
+ 
+diff --git a/uc.c b/uc.c
+index 75b89a0..0a759c1 100644
+--- a/uc.c
++++ b/uc.c
+@@ -1253,6 +1253,13 @@ uc_err uc_emu_start(uc_engine *uc, uint64_t begin, uint64_t until,
+     return err;
+ }
+ 
++UNICORN_EXPORT
++void uc_request_stop(uc_engine *uc)
++{
++    uc->stop_request = true;
++    cpu_exit(uc->cpu);
++}
++
+ UNICORN_EXPORT
+ uc_err uc_emu_stop(uc_engine *uc)
+ {
