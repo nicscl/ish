@@ -398,6 +398,8 @@ static NSString *const HANDLERS[] = {@"syncFocus", @"focus", @"newScrollHeight",
 #pragma mark Keyboard Actions
 
 - (void)paste:(id)sender {
+    if (self.pasteInterceptor != nil && self.pasteInterceptor())
+        return;
     NSString *string = UIPasteboard.generalPasteboard.string;
     if (string) {
         [self insertText:string];

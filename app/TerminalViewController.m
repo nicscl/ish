@@ -20,13 +20,19 @@
 #import "CurrentRoot.h"
 #import "NSObject+SaneKVO.h"
 #import "LinuxInterop.h"
+#import "ClipboardStore.h"
+#import "ClipboardShelfView.h"
+#import "ClipboardStackView.h"
+#import "ClipboardSettingsViewController.h"
+#import "ClipboardUI.h"
 #include "kernel/init.h"
 #include "kernel/task.h"
 #include "kernel/calls.h"
 #include "kernel/signal.h"
 #include "fs/devices.h"
 
-@interface TerminalViewController () <UIGestureRecognizerDelegate, TabBarViewDelegate>
+
+@interface TerminalViewController () <UIGestureRecognizerDelegate, TabBarViewDelegate, ClipboardShelfDelegate>
 
 @property UITapGestureRecognizer *tapRecognizer;
 @property (weak, nonatomic) IBOutlet TerminalView *termView;
@@ -56,6 +62,11 @@
 @property (nonatomic) TerminalSession *selectedSession;
 // The selected tab's terminal (self.terminal differs from this while a console is shown).
 @property (readonly) Terminal *sessionTerminal;
+
+// The clipboard manager, created the first time it is shown.
+@property (nullable) ClipboardShelfView *shelf;
+@property BOOL shelfShown;
+@property (nullable) ClipboardStackView *stackView;
 
 @property BOOL ignoreKeyboardMotion;
 @property (nonatomic) BOOL hasExternalKeyboard;
@@ -145,11 +156,31 @@
         });
     }];
     [self _updateBadge];
+
+    __weak typeof(self) weakSelf = self;
+    self.termView.pasteInterceptor = ^BOOL {
+        return [weakSelf pasteFromStack];
+    };
+    UILongPressGestureRecognizer *holdPaste = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(pasteButtonHeld:)];
+    [self.pasteButton addGestureRecognizer:holdPaste];
+    self.pasteButton.accessibilityCustomActions = @[[[UIAccessibilityCustomAction alloc] initWithName:@"Show Clipboard" actionHandler:^BOOL(UIAccessibilityCustomAction *action) {
+        [weakSelf showClipboard];
+        return YES;
+    }]];
+    [center addObserver:self selector:@selector(pasteStackDidChange:) name:ClipboardStackDidChangeNotification object:nil];
+    [self pasteStackDidChange:nil];
 }
 
 - (void)awakeFromNib {
     [super awakeFromNib];
     self.tabs = [NSMutableArray new];
+    // Copies made in iSH are labeled with the tab they came from.
+    ClipboardStore.shared.currentTabTitle = ^NSString *{
+        TerminalViewController *current = currentTerminalViewController;
+        if (current == nil)
+            current = ConnectedTerminalViewControllers().firstObject;
+        return current.selectedSession.displayTitle;
+    };
     [NSNotificationCenter.defaultCenter addObserver:self
                                            selector:@selector(sessionDidChange:)
                                                name:TerminalSessionDidChangeNotification
@@ -635,6 +666,14 @@ static NSString *ShellQuoted(NSString *string) {
     } else if (action == @selector(toggleKeepAlive:)) {
         BackgroundKeepAlive *keepAlive = BackgroundKeepAlive.shared;
         command.state = keepAlive.enabled && !keepAlive.denied ? UIMenuElementStateOn : UIMenuElementStateOff;
+    } else if (action == @selector(toggleClipboard:)) {
+        command.state = self.shelfShown ? UIMenuElementStateOn : UIMenuElementStateOff;
+    } else if (action == @selector(togglePasteStack:)) {
+        command.state = ClipboardStore.shared.stackActive ? UIMenuElementStateOn : UIMenuElementStateOff;
+    } else if (action == @selector(toggleClipboardCapture:)) {
+        BOOL paused = ClipboardStore.shared.paused;
+        command.title = paused ? @"Resume Capture" : @"Pause Capture";
+        command.image = [UIImage systemImageNamed:paused ? @"play" : @"pause"];
     } else if (action == @selector(switchTerminal:)) {
         int number = [command.propertyList intValue];
         BOOL current = number == 7 ? self.terminal == self.sessionTerminal
@@ -972,6 +1011,174 @@ static NSString *ShellQuoted(NSString *string) {
 
 - (void)removeSavedCommand:(UICommand *)sender {
     [SavedCommand removeAtIndex:[sender.propertyList unsignedIntegerValue]];
+}
+
+#pragma mark Clipboard menu
+
+- (void)toggleClipboard:(id)sender {
+    if (self.shelfShown)
+        [self hideClipboard];
+    else
+        [self showClipboard];
+}
+
+- (void)showClipboard {
+    if (self.shelfShown)
+        return;
+    if (self.shelf == nil) {
+        ClipboardShelfView *shelf = [ClipboardShelfView new];
+        shelf.delegate = self;
+        shelf.translatesAutoresizingMaskIntoConstraints = NO;
+        shelf.hidden = YES;
+        [self.view addSubview:shelf];
+        UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
+        [NSLayoutConstraint activateConstraints:@[
+            [shelf.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:10],
+            [shelf.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-10],
+            [shelf.bottomAnchor constraintEqualToAnchor:self.termView.bottomAnchor constant:-10],
+            [shelf.topAnchor constraintGreaterThanOrEqualToAnchor:self.tabBar.bottomAnchor constant:10],
+        ]];
+        self.shelf = shelf;
+    }
+    ClipboardShelfView *shelf = self.shelf;
+    // Anything copied in another app while iSH was in the background shows up now.
+    [ClipboardStore.shared checkPasteboard];
+    shelf.overrideUserInterfaceStyle = UserPreferences.shared.requestingDarkAppearance ? UIUserInterfaceStyleDark : UIUserInterfaceStyleLight;
+    [shelf prepareToShow];
+    self.shelfShown = YES;
+    shelf.hidden = NO;
+    [self.view bringSubviewToFront:shelf];
+    [self.view layoutIfNeeded];
+    shelf.transform = CGAffineTransformMakeTranslation(0, shelf.bounds.size.height / 2);
+    shelf.alpha = 0;
+    [UIView animateWithDuration:0.35 delay:0 usingSpringWithDamping:0.85 initialSpringVelocity:0 options:0 animations:^{
+        shelf.transform = CGAffineTransformIdentity;
+        shelf.alpha = 1;
+    } completion:nil];
+    [shelf becomeFirstResponder];
+    UIAccessibilityPostNotification(UIAccessibilityScreenChangedNotification, shelf);
+}
+
+- (void)hideClipboard {
+    if (!self.shelfShown)
+        return;
+    self.shelfShown = NO;
+    ClipboardShelfView *shelf = self.shelf;
+    [UIView animateWithDuration:0.2 animations:^{
+        shelf.transform = CGAffineTransformMakeTranslation(0, shelf.bounds.size.height / 3);
+        shelf.alpha = 0;
+    } completion:^(BOOL finished) {
+        if (!self.shelfShown) {
+            shelf.hidden = YES;
+            shelf.transform = CGAffineTransformIdentity;
+        }
+    }];
+    [self.termView becomeFirstResponder];
+}
+
+- (void)pasteButtonHeld:(UILongPressGestureRecognizer *)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateBegan)
+        [self showClipboard];
+}
+
+- (void)togglePasteStack:(id)sender {
+    ClipboardStore.shared.stackActive = !ClipboardStore.shared.stackActive;
+}
+
+- (void)toggleClipboardCapture:(id)sender {
+    ClipboardStore *store = ClipboardStore.shared;
+    if (store.paused)
+        [store resume];
+    else
+        [store pauseFor:0];
+    ClipShowToast(self.view, store.paused ? @"Clipboard Capture Paused" : @"Clipboard Capture Resumed", store.paused ? @"pause.fill" : @"play.fill");
+}
+
+- (void)newPinboard:(id)sender {
+    [self showClipboard];
+    [self.shelf promptForNewPinboard];
+}
+
+- (void)showClipboardSettings:(id)sender {
+    __weak typeof(self) weakSelf = self;
+    UIViewController *settings = [ClipboardSettingsViewController navigationControllerWithDismissHandler:^{
+        if (weakSelf.shelfShown)
+            [weakSelf.shelf becomeFirstResponder];
+    }];
+    UIViewController *presenter = self;
+    while (presenter.presentedViewController != nil)
+        presenter = presenter.presentedViewController;
+    [presenter presentViewController:settings animated:YES completion:nil];
+}
+
+// The stack panel follows the store, so every window shows it while it is open.
+- (void)pasteStackDidChange:(NSNotification *)notif {
+    BOOL active = ClipboardStore.shared.stackActive;
+    if (active && self.stackView == nil) {
+        ClipboardStackView *stack = [ClipboardStackView new];
+        stack.translatesAutoresizingMaskIntoConstraints = NO;
+        stack.closeHandler = ^{
+            ClipboardStore.shared.stackActive = NO;
+        };
+        [self.view addSubview:stack];
+        [NSLayoutConstraint activateConstraints:@[
+            [stack.topAnchor constraintEqualToAnchor:self.tabBar.bottomAnchor constant:10],
+            [stack.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:-12],
+        ]];
+        self.stackView = stack;
+        stack.alpha = 0;
+        [UIView animateWithDuration:0.2 animations:^{
+            stack.alpha = 1;
+        }];
+    } else if (!active && self.stackView != nil) {
+        ClipboardStackView *stack = self.stackView;
+        self.stackView = nil;
+        [UIView animateWithDuration:0.2 animations:^{
+            stack.alpha = 0;
+        } completion:^(BOOL finished) {
+            [stack removeFromSuperview];
+        }];
+    }
+}
+
+// While the Paste Stack is open, paste takes the next item off it.
+- (BOOL)pasteFromStack {
+    ClipboardStore *store = ClipboardStore.shared;
+    if (!store.stackActive)
+        return NO;
+    ClipItem *item = [store popStackItem];
+    if (item == nil)
+        return NO;
+    [store copyItems:@[item] plainText:ClipboardPreferences.shared.alwaysPlainText];
+    NSString *text = [store textForItems:@[item]];
+    if (text == nil) {
+        ClipShowToast(self.view, @"Image Copied", @"photo");
+        return YES;
+    }
+    [self.termView insertText:text];
+    return YES;
+}
+
+#pragma mark ClipboardShelfDelegate
+
+- (void)shelf:(ClipboardShelfView *)shelf pasteText:(NSString *)text {
+    [self.termView insertText:text];
+}
+
+- (void)shelfDidRequestClose:(ClipboardShelfView *)shelf {
+    [self hideClipboard];
+}
+
+- (UIViewController *)presentingViewControllerForShelf:(ClipboardShelfView *)shelf {
+    return self;
+}
+
+- (void)shelfDidRequestSettings:(ClipboardShelfView *)shelf {
+    [self showClipboardSettings:shelf];
+}
+
+- (void)shelfDidRequestPasteStack:(ClipboardShelfView *)shelf {
+    [self togglePasteStack:shelf];
 }
 
 - (void)setTerminal:(Terminal *)terminal {

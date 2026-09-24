@@ -16,6 +16,9 @@
 - (void)setUp {
     self.continueAfterFailure = NO;
     self.app = [XCUIApplication new];
+    // Reading what other apps copied brings up iOS's paste permission alert, which
+    // would stop the tests; copies made inside iSH are all they need.
+    self.app.launchArguments = @[@"-Clipboard.collectFromOtherApps", @"NO"];
     [self.app launch];
     XCTAssert([self.app.webViews.staticTexts.firstMatch waitForExistenceWithTimeout:30]);
 }
@@ -261,6 +264,116 @@
     [self chooseCommand:@[@"Tools", @"Saved Commands", @"Remove", name]];
     [self chooseCommand:@[@"Tools", @"Saved Commands"]];
     XCTAssertFalse([self menuItem:name].exists, @"the removed command should be gone from the menu");
+}
+
+#pragma mark Clipboard manager
+
+- (XCUIElement *)shelf {
+    return [self.app descendantsMatchingType:XCUIElementTypeAny][@"clipboard shelf"];
+}
+
+- (void)showClipboard {
+    [self.app typeKey:@"v" modifierFlags:XCUIKeyModifierCommand | XCUIKeyModifierShift];
+    XCTAssert([self.shelf waitForExistenceWithTimeout:5], @"Shift-Cmd-V should show the clipboard");
+    // Keys typed while the keyboard is still switching over to the shelf get lost.
+    sleep(1);
+}
+
+// A card whose accessibility label mentions the text.
+- (XCUIElement *)cardContaining:(NSString *)text {
+    return [self.app.cells matchingPredicate:[NSPredicate predicateWithFormat:@"label CONTAINS %@", text]].firstMatch;
+}
+
+// Clipboard history persists across runs, so every test uses its own marker.
+- (NSString *)marker:(NSString *)prefix {
+    return [NSString stringWithFormat:@"%@%u", prefix, arc4random_uniform(1000000)];
+}
+
+// What is written to /dev/clipboard lands in the history, and Return types it at the prompt.
+- (void)testClipboardCapturesAndPastes {
+    NSString *mark = [self marker:@"clip"];
+    [self waitForTerminalText:@":~#" timeout:30];
+    [self.app typeText:[NSString stringWithFormat:@"printf %@ > /dev/clipboard\n", mark]];
+    sleep(1);
+    [self.app typeText:@"echo got-"];
+    [self showClipboard];
+    XCUIElement *card = [self cardContaining:mark];
+    XCTAssert([card waitForExistenceWithTimeout:5], @"the copy should be in the history");
+    [self attachScreenshotNamed:@"clipboard shelf"];
+    // The newest item starts selected; Return pastes it and closes the shelf.
+    [self.app typeText:@"\n"];
+    XCTAssert([self.shelf waitForNonExistenceWithTimeout:5] || !self.shelf.isHittable);
+    [self.app typeText:@"\n"];
+    [self waitForTerminalText:[@"got-" stringByAppendingString:mark] timeout:10];
+}
+
+// Search narrows the cards; a pinboard keeps what is pinned to it.
+- (void)testClipboardSearchAndPinboards {
+    NSString *mark = [self marker:@"pinme"];
+    NSString *board = [self marker:@"Board "];
+    [self waitForTerminalText:@":~#" timeout:30];
+    [self.app typeText:[NSString stringWithFormat:@"printf %@ > /dev/clipboard\n", mark]];
+    sleep(1);
+    [self showClipboard];
+    XCTAssert([[self cardContaining:mark] waitForExistenceWithTimeout:5]);
+
+    // Search (⌘F does the same on a device; the Simulator drops it at times)
+    XCUIElement *searchButton = [[self.app descendantsMatchingType:XCUIElementTypeAny][@"clipboard search"] firstMatch];
+    [searchButton tap];
+    XCUIElement *field = [self.app descendantsMatchingType:XCUIElementTypeAny][@"clipboard search field"];
+    XCTAssert([field waitForExistenceWithTimeout:5]);
+    [self.app typeText:mark];
+    XCTAssert([[self cardContaining:mark] waitForExistenceWithTimeout:5]);
+    XCTAssertEqual([self.app.cells matchingPredicate:[NSPredicate predicateWithFormat:@"identifier BEGINSWITH 'clip '"]].count, 1);
+    [self attachScreenshotNamed:@"clipboard search"];
+    [self.app typeText:@"zzz"];
+    XCTAssert([self.app.staticTexts[@"No Results"] waitForExistenceWithTimeout:5]);
+    // The Simulator does not deliver Escape, which also ends search; tapping the
+    // magnifying glass again does the same.
+    [searchButton tap];
+    XCTAssert([field waitForNonExistenceWithTimeout:5]);
+
+    // Pin it to a new pinboard from the card's menu.
+    [[self cardContaining:mark] pressForDuration:1.0];
+    XCTAssert([[self menuItem:@"Pin to"] waitForExistenceWithTimeout:5]);
+    [[self menuItem:@"Pin to"] tap];
+    [[self menuItem:@"New Pinboard…"] tap];
+    XCUIElement *alert = self.app.alerts[@"New Pinboard"];
+    XCTAssert([alert waitForExistenceWithTimeout:5]);
+    [self.app typeText:board];
+    [alert.buttons[@"Create"] tap];
+    XCUIElement *tab = self.app.cells[[@"pinboard " stringByAppendingString:board]];
+    XCTAssert([tab waitForExistenceWithTimeout:5], @"the new pinboard should have a tab");
+    [tab tap];
+    XCTAssert([[self cardContaining:mark] waitForExistenceWithTimeout:5], @"the pinned copy should be on the pinboard");
+    [self attachScreenshotNamed:@"pinboard"];
+
+    // Delete the pinboard again, so runs don't pile them up.
+    [tab pressForDuration:1.0];
+    [[self menuItem:@"Delete Pinboard…"] tap];
+    XCUIElement *confirm = self.app.alerts.firstMatch;
+    XCTAssert([confirm waitForExistenceWithTimeout:5]);
+    [confirm.buttons[@"Delete"] tap];
+    XCTAssert([tab waitForNonExistenceWithTimeout:5]);
+}
+
+// With the Paste Stack open, copies queue up and each paste takes the next one.
+- (void)testPasteStack {
+    NSString *mark = [self marker:@"s"];
+    [self waitForTerminalText:@":~#" timeout:30];
+    [self chooseCommand:@[@"Clipboard", @"Paste Stack"]];
+    XCTAssert([self.app.otherElements[@"paste stack"] waitForExistenceWithTimeout:5]);
+    [self.app typeText:[NSString stringWithFormat:@"printf %@a > /dev/clipboard; sleep 1; printf %@b > /dev/clipboard\n", mark, mark]];
+    sleep(3);
+    [self attachScreenshotNamed:@"paste stack"];
+    [self.app typeText:@"echo "];
+    [self chooseCommand:@[@"Paste"]];
+    [self.app typeText:@"-"];
+    [self chooseCommand:@[@"Paste"]];
+    [self.app typeText:@"\n"];
+    [self waitForTerminalText:[NSString stringWithFormat:@"%@a-%@b", mark, mark] timeout:10];
+    [self chooseCommand:@[@"Clipboard", @"Paste Stack"]];
+    XCTAssert([self.app.otherElements[@"paste stack"] waitForNonExistenceWithTimeout:5]);
 }
 
 - (void)testShellRunsCommands {

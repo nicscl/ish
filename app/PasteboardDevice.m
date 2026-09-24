@@ -4,6 +4,7 @@
 #include "fs/dyndev.h"
 #include "kernel/errno.h"
 #include "debug.h"
+#import "ClipboardStore.h"
 
 /**
  * buffer is dynamically sized buffer of size buffer_cap
@@ -91,6 +92,7 @@ static int clipboard_write_sync(clip_fd *fd) {
                                              initWithBytes:data
                                              length:len
                                              encoding:NSUTF8StringEncoding];
+    ClipboardNoteLinuxWrite();
 
     // Reset generation since we've just updated UIPasteboard
     // note: offset doesn't change

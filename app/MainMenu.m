@@ -214,6 +214,23 @@ static UIMenu *ToolsMenu(void) {
     ]);
 }
 
+static UIMenu *ClipboardMenu(void) {
+    return Submenu(@"Clipboard", @"doc.on.clipboard", @"clipboard", @[
+        Group(@"clipboard.show", @[
+            Key(@"Show Clipboard", @"doc.on.clipboard", @selector(toggleClipboard:), @"v", kShiftCmd, nil),
+            Key(@"Paste Stack", @"square.stack.3d.up", @selector(togglePasteStack:), @"c", kShiftCmd, nil),
+        ]),
+        Group(@"clipboard.capture", @[
+            // Title and state are set by validateCommand: (Pause or Resume).
+            Cmd(@"Pause Capture", @"pause", @selector(toggleClipboardCapture:), nil),
+        ]),
+        Group(@"clipboard.organize", @[
+            Key(@"New Pinboard…", @"plus.rectangle.on.rectangle", @selector(newPinboard:), @"n", kShiftCmd, nil),
+            Cmd(@"Clipboard Settings…", @"gear", @selector(showClipboardSettings:), nil),
+        ]),
+    ]);
+}
+
 static NSArray<UIMenuElement *> *HelpItems(void) {
     return @[
         Link(@"iSH Wiki", @"book", @"https://github.com/ish-app/ish/wiki"),
@@ -265,6 +282,7 @@ static UICommand *SettingsCommand(void) {
     }
     [builder insertSiblingMenu:TabsMenu() afterMenuForIdentifier:UIMenuView];
     [builder insertSiblingMenu:ToolsMenu() afterMenuForIdentifier:ID(@"tabs")];
+    [builder insertSiblingMenu:ClipboardMenu() afterMenuForIdentifier:ID(@"tools")];
 
     UIMenu *help = Group(@"help.links", HelpItems());
     if ([builder menuForIdentifier:UIMenuHelp] != nil)
@@ -281,6 +299,7 @@ static UICommand *SettingsCommand(void) {
         Group(@"commands.quick", @[
             Key(@"New Tab", @"plus", @selector(newTab:), @"t", kCmd, nil),
             Cmd(@"Paste", @"doc.on.clipboard", @selector(paste:), nil),
+            Cmd(@"Show Clipboard", @"list.clipboard", @selector(toggleClipboard:), nil),
             // Only shown while the keyboard is up, since the terminal handles it then.
             Cmd(@"Hide Keyboard", @"keyboard.chevron.compact.down", @selector(loseFocus:), nil),
             settings,
@@ -292,6 +311,7 @@ static UICommand *SettingsCommand(void) {
         ViewMenu(),
         TabsMenu(),
         ToolsMenu(),
+        ClipboardMenu(),
         Submenu(@"Help", @"questionmark.circle", @"help", HelpItems()),
     ]];
 }

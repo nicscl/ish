@@ -123,6 +123,12 @@
 		A1C0FFEE0000000000000001 /* BackgroundKeepAlive.m in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000003 /* BackgroundKeepAlive.m */; };
 		BAD6F576587B85A71CB9ED91 /* MainMenu.m in Sources */ = {isa = PBXBuildFile; fileRef = 85763DE5C6EB38FA09DCC0FF /* MainMenu.m */; };
 		9579B14DD5DE4278B208142C /* TabBarView.m in Sources */ = {isa = PBXBuildFile; fileRef = 68D2CA8679F943DF899D0875 /* TabBarView.m */; };
+		37866B9B09ADB455BA597189 /* ClipboardStore.m in Sources */ = {isa = PBXBuildFile; fileRef = 8D10F1C4C0DFFAEB97105C78 /* ClipboardStore.m */; };
+		13230F0F9781F2D3A1B72429 /* ClipboardUI.m in Sources */ = {isa = PBXBuildFile; fileRef = C8DC27DF5D78EF3EAB026982 /* ClipboardUI.m */; };
+		B3A4D526605E46F55C0E8ECA /* ClipboardShelfView.m in Sources */ = {isa = PBXBuildFile; fileRef = C441768938A29F56E1ACBDCA /* ClipboardShelfView.m */; };
+		4BB04ACCE4F32110182A658D /* ClipboardItemViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = C9F5184E00E5A825E6039CDE /* ClipboardItemViewController.m */; };
+		785274A62C3663002E1A5877 /* ClipboardStackView.m in Sources */ = {isa = PBXBuildFile; fileRef = 41C8EF669BC2DFC88083DF7E /* ClipboardStackView.m */; };
+		CE0E058DCA6C5E29C6B30547 /* ClipboardSettingsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = CE331FAA24D08D73A2254BAF /* ClipboardSettingsViewController.m */; };
 		BB28C79726896B1F00BDC834 /* TerminalView.m in Sources */ = {isa = PBXBuildFile; fileRef = BB78AB2A1FAD22440013E782 /* TerminalView.m */; };
 		BB28C79826896B1F00BDC834 /* ScrollbarView.m in Sources */ = {isa = PBXBuildFile; fileRef = BB23F58C231E1D1400585522 /* ScrollbarView.m */; };
 		BB28C79926896B1F00BDC834 /* DelayedUITask.m in Sources */ = {isa = PBXBuildFile; fileRef = BB455E101FB37F6600AFB48B /* DelayedUITask.m */; };
@@ -683,6 +689,18 @@
 		85763DE5C6EB38FA09DCC0FF /* MainMenu.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MainMenu.m; sourceTree = "<group>"; };
 		873A025C581D462E8C6BF740 /* TabBarView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TabBarView.h; sourceTree = "<group>"; };
 		68D2CA8679F943DF899D0875 /* TabBarView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TabBarView.m; sourceTree = "<group>"; };
+		282D7A6CA6EEA54484B1FCBF /* ClipboardStore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClipboardStore.h; sourceTree = "<group>"; };
+		8D10F1C4C0DFFAEB97105C78 /* ClipboardStore.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ClipboardStore.m; sourceTree = "<group>"; };
+		6B1C47CFA28A373EED44C888 /* ClipboardUI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClipboardUI.h; sourceTree = "<group>"; };
+		C8DC27DF5D78EF3EAB026982 /* ClipboardUI.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ClipboardUI.m; sourceTree = "<group>"; };
+		0DA29B3E5C0B7D4F5BA37E46 /* ClipboardShelfView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClipboardShelfView.h; sourceTree = "<group>"; };
+		C441768938A29F56E1ACBDCA /* ClipboardShelfView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ClipboardShelfView.m; sourceTree = "<group>"; };
+		873FEC0B6A40C01B4DA77496 /* ClipboardItemViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClipboardItemViewController.h; sourceTree = "<group>"; };
+		C9F5184E00E5A825E6039CDE /* ClipboardItemViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ClipboardItemViewController.m; sourceTree = "<group>"; };
+		409962C37EF8BFA75F957B4C /* ClipboardStackView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClipboardStackView.h; sourceTree = "<group>"; };
+		41C8EF669BC2DFC88083DF7E /* ClipboardStackView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ClipboardStackView.m; sourceTree = "<group>"; };
+		7451B20C0D0F0B3015E8A12E /* ClipboardSettingsViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClipboardSettingsViewController.h; sourceTree = "<group>"; };
+		CE331FAA24D08D73A2254BAF /* ClipboardSettingsViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ClipboardSettingsViewController.m; sourceTree = "<group>"; };
 		BB78AB291FAD22440013E782 /* TerminalView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TerminalView.h; sourceTree = "<group>"; };
 		BB78AB2A1FAD22440013E782 /* TerminalView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TerminalView.m; sourceTree = "<group>"; };
 		BB792B501F96D90D00FFB7A4 /* iSH.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iSH.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1077,6 +1095,18 @@
 				85763DE5C6EB38FA09DCC0FF /* MainMenu.m */,
 				873A025C581D462E8C6BF740 /* TabBarView.h */,
 				68D2CA8679F943DF899D0875 /* TabBarView.m */,
+				282D7A6CA6EEA54484B1FCBF /* ClipboardStore.h */,
+				8D10F1C4C0DFFAEB97105C78 /* ClipboardStore.m */,
+				6B1C47CFA28A373EED44C888 /* ClipboardUI.h */,
+				C8DC27DF5D78EF3EAB026982 /* ClipboardUI.m */,
+				0DA29B3E5C0B7D4F5BA37E46 /* ClipboardShelfView.h */,
+				C441768938A29F56E1ACBDCA /* ClipboardShelfView.m */,
+				873FEC0B6A40C01B4DA77496 /* ClipboardItemViewController.h */,
+				C9F5184E00E5A825E6039CDE /* ClipboardItemViewController.m */,
+				409962C37EF8BFA75F957B4C /* ClipboardStackView.h */,
+				41C8EF669BC2DFC88083DF7E /* ClipboardStackView.m */,
+				7451B20C0D0F0B3015E8A12E /* ClipboardSettingsViewController.h */,
+				CE331FAA24D08D73A2254BAF /* ClipboardSettingsViewController.m */,
 				BB78AB291FAD22440013E782 /* TerminalView.h */,
 				BB78AB2A1FAD22440013E782 /* TerminalView.m */,
 				BB0FC5901F980A6B00803272 /* Terminal.h */,
@@ -2215,6 +2245,12 @@
 				A1C0FFEE0000000000000001 /* BackgroundKeepAlive.m in Sources */,
 				BAD6F576587B85A71CB9ED91 /* MainMenu.m in Sources */,
 				9579B14DD5DE4278B208142C /* TabBarView.m in Sources */,
+				37866B9B09ADB455BA597189 /* ClipboardStore.m in Sources */,
+				13230F0F9781F2D3A1B72429 /* ClipboardUI.m in Sources */,
+				B3A4D526605E46F55C0E8ECA /* ClipboardShelfView.m in Sources */,
+				4BB04ACCE4F32110182A658D /* ClipboardItemViewController.m in Sources */,
+				785274A62C3663002E1A5877 /* ClipboardStackView.m in Sources */,
+				CE0E058DCA6C5E29C6B30547 /* ClipboardSettingsViewController.m in Sources */,
 				BB28C79726896B1F00BDC834 /* TerminalView.m in Sources */,
 				497A08BF29633FF400B323CF /* mach_exc.defs in Sources */,
 				BB28C79826896B1F00BDC834 /* ScrollbarView.m in Sources */,

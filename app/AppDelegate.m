@@ -20,6 +20,7 @@
 #import "PasteboardDevice.h"
 #import "LocationDevice.h"
 #import "MainMenu.h"
+#import "ClipboardStore.h"
 #import "BackgroundKeepAlive.h"
 #import "NSObject+SaneKVO.h"
 #import "Roots.h"
@@ -261,6 +262,8 @@ void NetworkReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
 
     // Resumes location updates if the keep-alive was left on.
     [BackgroundKeepAlive shared];
+    // Starts collecting what gets copied, for the clipboard manager.
+    [ClipboardStore.shared start];
 
 #if !ISH_LINUX
     NSString *ishVersion = [NSString stringWithFormat:@"iSH %@ (%@)",
