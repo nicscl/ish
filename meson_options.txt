@@ -3,6 +3,8 @@ option('nolog', type: 'string', value: '')
 option('log_handler', type: 'string', value: 'dprintf')
 
 option('engine', type: 'combo', choices: ['asbestos', 'unicorn'], value: 'asbestos')
+option('unicorn', type: 'feature', value: 'disabled', description: 'ISH_ENGINE=unicorn runtime engine (GPLv2, for benchmarking)')
+option('unicorn_dir', type: 'string', value: '', description: 'Unicorn source tree built in <dir>/build (default: Homebrew)')
 option('kernel', type: 'combo', choices: ['ish', 'linux'], value: 'ish')
 option('kconfig', type: 'array', value: [])
 

@@ -5,6 +5,7 @@
 #include "asbestos/frame.h"
 #include "emu/cpu.h"
 #include "emu/interrupt.h"
+#include "emu/unicorn.h"
 #include "util/list.h"
 
 extern int current_pid(void);
@@ -262,6 +263,8 @@ static int cpu_single_step(struct cpu_state *cpu, struct tlb *tlb) {
 int cpu_run_to_interrupt(struct cpu_state *cpu, struct tlb *tlb) {
     if (cpu->poked_ptr == NULL)
         cpu->poked_ptr = &cpu->_poked;
+    if (unicorn_enabled)
+        return cpu->trapno = unicorn_run_to_interrupt(cpu);
     tlb_refresh(tlb, cpu->mmu);
     int interrupt = (cpu->tf ? cpu_single_step : cpu_step_to_interrupt)(cpu, tlb);
     cpu->trapno = interrupt;
@@ -285,4 +288,6 @@ int cpu_run_to_interrupt(struct cpu_state *cpu, struct tlb *tlb) {
 
 void cpu_poke(struct cpu_state *cpu) {
     __atomic_store_n(cpu->poked_ptr, true, __ATOMIC_SEQ_CST);
+    if (unicorn_enabled)
+        unicorn_poke(cpu);
 }

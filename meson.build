@@ -37,6 +37,25 @@ libdl = cc.find_library('dl', required: false)
 sqlite3 = cc.find_library('sqlite3')
 dependencies = [librt, libm, libdl, threads, sqlite3]
 
+unicorn_dep = []
+if get_option('unicorn').enabled()
+    unicorn_dir = get_option('unicorn_dir')
+    if unicorn_dir == ''
+        unicorn_prefix = run_command('brew', '--prefix', check: false).stdout().strip()
+        unicorn_lib = unicorn_prefix + '/lib'
+        unicorn_inc = unicorn_prefix + '/include'
+    else
+        unicorn_lib = unicorn_dir + '/build'
+        unicorn_inc = unicorn_dir + '/include'
+    endif
+    unicorn_dep = declare_dependency(
+        dependencies: cc.find_library('unicorn', dirs: [unicorn_lib]),
+        compile_args: ['-I' + unicorn_inc],
+        link_args: ['-Wl,-rpath,' + unicorn_lib])
+    add_project_arguments('-DENGINE_UNICORN_ISH=1', language: 'c')
+    dependencies += unicorn_dep
+endif
+
 subdir('vdso') # ish depends on the vdso
 
 offsets = custom_target('offsets',
@@ -65,8 +84,11 @@ emu_src += [
     gadgets+'/misc.S',
     offsets,
 ]
+if get_option('unicorn').enabled()
+    emu_src += 'emu/unicorn.c'
+endif
 
-libish_emu = library('ish_emu', emu_src, include_directories: includes)
+libish_emu = library('ish_emu', emu_src, include_directories: includes, dependencies: unicorn_dep)
 
 libfakefs = library('fakefs',
     ['fs/fake-db.c', 'fs/fake-migrate.c', 'fs/fake-rebuild.c'],

@@ -6,6 +6,7 @@
 #include "kernel/task.h"
 #include "kernel/memory.h"
 #include "emu/tlb.h"
+#include "emu/unicorn.h"
 
 __thread struct task *current;
 
@@ -90,6 +91,7 @@ struct task *task_create_(struct task *parent) {
 }
 
 void task_destroy(struct task *task) {
+    unicorn_cpu_free(&task->cpu);
     list_remove(&task->siblings);
     pid_get(task->pid)->task = NULL;
     free(task);

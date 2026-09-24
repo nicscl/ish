@@ -1,3 +1,4 @@
+#include "emu/unicorn.h"
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
@@ -81,6 +82,7 @@ static inline int xX_main_Xx(int argc, char *const argv[], const char *envp) {
     if (err < 0)
         return err;
 
+    unicorn_init();
     become_first_process();
     current->thread = pthread_self();
     char cwd[MAX_PATH + 1];

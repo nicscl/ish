@@ -171,6 +171,8 @@ struct cpu_state {
     // access atomically
     bool *poked_ptr;
     bool _poked;
+
+    void *unicorn; // engine state when running with ISH_ENGINE=unicorn
 };
 
 #define CPU_OFFSET(field) offsetof(struct cpu_state, field)

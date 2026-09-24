@@ -8,6 +8,7 @@
 
 #define DEFAULT_CHANNEL memory
 #include "debug.h"
+#include "emu/unicorn.h"
 #include "kernel/errno.h"
 #include "kernel/signal.h"
 #include "kernel/memory.h"
@@ -153,6 +154,7 @@ int pt_unmap_always(struct mem *mem, page_t start, pages_t pages) {
         if (--data->refcount == 0) {
             // vdso wasn't allocated with mmap, it's just in our data segment
             if (data->data != vdso_data) {
+                unicorn_data_freed(data->data, data->size);
                 int err = munmap(data->data, data->size);
                 if (err != 0)
                     die("munmap(%p, %lu) failed: %s", data->data, data->size, strerror(errno));
